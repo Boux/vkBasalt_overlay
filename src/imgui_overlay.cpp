@@ -2,6 +2,8 @@
 #include "logger.hpp"
 #include "mouse_input.hpp"
 
+#include <cmath>
+
 #include "imgui/imgui.h"
 #include "imgui/backends/imgui_impl_vulkan.h"
 
@@ -347,10 +349,37 @@ namespace vkBasalt
                 switch (param.type)
                 {
                 case ParamType::Float:
-                    ImGui::SliderFloat(param.label.c_str(), &param.valueFloat, param.minFloat, param.maxFloat);
+                    if (ImGui::SliderFloat(param.label.c_str(), &param.valueFloat, param.minFloat, param.maxFloat))
+                    {
+                        // Snap to step if specified
+                        if (param.step > 0.0f)
+                            param.valueFloat = std::round(param.valueFloat / param.step) * param.step;
+                    }
                     break;
                 case ParamType::Int:
-                    ImGui::SliderInt(param.label.c_str(), &param.valueInt, param.minInt, param.maxInt);
+                    // Check for combo box (ui_type="combo" or has items)
+                    if (!param.items.empty())
+                    {
+                        // Build items string for Combo (null-separated, double-null terminated)
+                        std::string itemsStr;
+                        for (const auto& item : param.items)
+                            itemsStr += item + '\0';
+                        itemsStr += '\0';
+                        ImGui::Combo(param.label.c_str(), &param.valueInt, itemsStr.c_str());
+                    }
+                    else
+                    {
+                        if (ImGui::SliderInt(param.label.c_str(), &param.valueInt, param.minInt, param.maxInt))
+                        {
+                            // Snap to step if specified
+                            if (param.step > 0.0f)
+                            {
+                                int step = (int)param.step;
+                                if (step > 0)
+                                    param.valueInt = (param.valueInt / step) * step;
+                            }
+                        }
+                    }
                     break;
                 case ParamType::Bool:
                     ImGui::Checkbox(param.label.c_str(), &param.valueBool);

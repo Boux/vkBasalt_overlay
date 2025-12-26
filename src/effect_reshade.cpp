@@ -1069,6 +1069,37 @@ namespace vkBasalt
                 }
             }
 
+            // Get ui_step
+            auto stepIt = std::find_if(spec.annotations.begin(), spec.annotations.end(),
+                [](const auto& a) { return a.name == "ui_step"; });
+            if (stepIt != spec.annotations.end())
+                p.step = stepIt->type.is_floating_point() ? stepIt->value.as_float[0] : (float)stepIt->value.as_int[0];
+
+            // Get ui_type
+            auto typeIt = std::find_if(spec.annotations.begin(), spec.annotations.end(),
+                [](const auto& a) { return a.name == "ui_type"; });
+            if (typeIt != spec.annotations.end())
+                p.uiType = typeIt->value.string_data;
+
+            // Get ui_items (null-separated list for combo boxes)
+            auto itemsIt = std::find_if(spec.annotations.begin(), spec.annotations.end(),
+                [](const auto& a) { return a.name == "ui_items"; });
+            if (itemsIt != spec.annotations.end())
+            {
+                std::string itemsStr = itemsIt->value.string_data;
+                // Parse null-separated items
+                size_t start = 0;
+                for (size_t i = 0; i <= itemsStr.size(); i++)
+                {
+                    if (i == itemsStr.size() || itemsStr[i] == '\0')
+                    {
+                        if (i > start)
+                            p.items.push_back(itemsStr.substr(start, i - start));
+                        start = i + 1;
+                    }
+                }
+            }
+
             params.push_back(p);
         }
 
