@@ -753,9 +753,12 @@ namespace vkBasalt
             Logger::debug(std::to_string(i) + " written commandbuffer " + convertToString(pLogicalSwapchain->commandBuffersNoEffect[i]));
         }
 
-        // Create ImGui overlay
+        // Create ImGui overlay with persistent state
+        if (!pLogicalDevice->overlayPersistentState)
+            pLogicalDevice->overlayPersistentState = std::make_unique<OverlayPersistentState>();
         pLogicalSwapchain->imguiOverlay = std::make_unique<ImGuiOverlay>(
-            pLogicalDevice, pLogicalSwapchain->format, pLogicalSwapchain->imageCount);
+            pLogicalDevice, pLogicalSwapchain->format, pLogicalSwapchain->imageCount,
+            pLogicalDevice->overlayPersistentState.get());
 
         *pCount = std::min<uint32_t>(*pCount, pLogicalSwapchain->imageCount);
         std::memcpy(pSwapchainImages, pLogicalSwapchain->fakeImages.data(), sizeof(VkImage) * (*pCount));

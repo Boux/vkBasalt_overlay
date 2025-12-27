@@ -99,8 +99,8 @@ namespace vkBasalt
         return (PFN_vkVoidFunction)dummyVulkanFunc;
     }
 
-    ImGuiOverlay::ImGuiOverlay(LogicalDevice* device, VkFormat swapchainFormat, uint32_t imageCount)
-        : pLogicalDevice(device)
+    ImGuiOverlay::ImGuiOverlay(LogicalDevice* device, VkFormat swapchainFormat, uint32_t imageCount, OverlayPersistentState* persistentState)
+        : pLogicalDevice(device), pPersistentState(persistentState)
     {
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
@@ -112,6 +112,17 @@ namespace vkBasalt
         style.WindowRounding = 5.0f;
 
         initVulkanBackend(swapchainFormat, imageCount);
+
+        // Restore state from persistent state if available
+        if (pPersistentState && pPersistentState->initialized)
+        {
+            selectedEffects = pPersistentState->selectedEffects;
+            effectEnabledStates = pPersistentState->effectEnabledStates;
+            editableParams = pPersistentState->editableParams;
+            autoApply = pPersistentState->autoApply;
+            visible = pPersistentState->visible;
+            applyRequested = true;  // Rebuild effect chain with restored state
+        }
 
         initialized = true;
         Logger::info("ImGui overlay initialized");
@@ -135,6 +146,19 @@ namespace vkBasalt
             pLogicalDevice->vkd.DestroyDescriptorPool(pLogicalDevice->device, descriptorPool, nullptr);
 
         Logger::info("ImGui overlay destroyed");
+    }
+
+    void ImGuiOverlay::saveToPersistentState()
+    {
+        if (!pPersistentState)
+            return;
+
+        pPersistentState->selectedEffects = selectedEffects;
+        pPersistentState->effectEnabledStates = effectEnabledStates;
+        pPersistentState->editableParams = editableParams;
+        pPersistentState->autoApply = autoApply;
+        pPersistentState->visible = visible;
+        pPersistentState->initialized = true;
     }
 
     void ImGuiOverlay::updateState(const OverlayState& newState)
@@ -435,6 +459,7 @@ namespace vkBasalt
                 }
                 inSelectionMode = false;
                 applyRequested = true;  // Trigger reload with new effects
+                saveToPersistentState();
             }
             ImGui::SameLine();
             if (ImGui::Button("Cancel"))
@@ -466,7 +491,6 @@ namespace vkBasalt
             // Show selected effects with their parameters
             bool changedThisFrame = false;
             float itemHeight = ImGui::GetFrameHeightWithSpacing();
-            float listStartY = ImGui::GetCursorScreenPos().y;
 
             // Reset drag target each frame
             dragTargetIndex = -1;
@@ -601,6 +625,7 @@ namespace vkBasalt
                         changedThisFrame = true;
                         paramsDirty = true;
                         lastChangeTime = std::chrono::steady_clock::now();
+                        saveToPersistentState();
                     }
                     isDragging = false;
                     dragSourceIndex = -1;
@@ -611,7 +636,10 @@ namespace vkBasalt
             ImGui::EndChild();
 
             ImGui::Separator();
+            bool prevAutoApply = autoApply;
             ImGui::Checkbox("Apply automatically", &autoApply);
+            if (autoApply != prevAutoApply)
+                saveToPersistentState();
             ImGui::SameLine(ImGui::GetWindowWidth() - 60);
             if (autoApply)
             {
@@ -629,14 +657,22 @@ namespace vkBasalt
                     {
                         applyRequested = true;
                         paramsDirty = false;
+                        saveToPersistentState();
                     }
                 }
             }
             else
             {
                 if (ImGui::Button("Apply"))
+                {
                     applyRequested = true;
+                    saveToPersistentState();
+                }
             }
+
+            // Save state when effects/params change
+            if (changedThisFrame)
+                saveToPersistentState();
         }
 
         ImGui::End();

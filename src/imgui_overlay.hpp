@@ -49,13 +49,24 @@ namespace vkBasalt
         std::vector<EffectParameter> parameters;
     };
 
+    // Persistent state that survives swapchain recreation
+    struct OverlayPersistentState
+    {
+        std::vector<std::string> selectedEffects;
+        std::map<std::string, bool> effectEnabledStates;
+        std::vector<EffectParameter> editableParams;
+        bool autoApply = false;
+        bool visible = false;
+        bool initialized = false;  // True once user has interacted with overlay
+    };
+
     class ImGuiOverlay
     {
     public:
-        ImGuiOverlay(LogicalDevice* device, VkFormat swapchainFormat, uint32_t imageCount);
+        ImGuiOverlay(LogicalDevice* device, VkFormat swapchainFormat, uint32_t imageCount, OverlayPersistentState* persistentState);
         ~ImGuiOverlay();
 
-        void toggle() { visible = !visible; }
+        void toggle() { visible = !visible; saveToPersistentState(); }
         bool isVisible() const { return visible; }
 
         void updateState(const OverlayState& state);
@@ -75,8 +86,10 @@ namespace vkBasalt
 
     private:
         void initVulkanBackend(VkFormat swapchainFormat, uint32_t imageCount);
+        void saveToPersistentState();
 
         LogicalDevice* pLogicalDevice;
+        OverlayPersistentState* pPersistentState;
         VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
         VkRenderPass renderPass = VK_NULL_HANDLE;
         VkCommandPool commandPool = VK_NULL_HANDLE;
