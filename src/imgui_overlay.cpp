@@ -339,6 +339,7 @@ namespace vkBasalt
         io.MouseDown[1] = mouse.rightButton;
         io.MouseDown[2] = mouse.middleButton;
         io.MouseWheel = mouse.scrollDelta;
+        io.MouseDrawCursor = true;  // Draw software cursor (games often hide the OS cursor)
 
         // ImGui frame
         ImGui_ImplVulkan_NewFrame();
