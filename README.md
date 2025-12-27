@@ -9,6 +9,7 @@ git checkout feature/imgui
 meson setup --buildtype=debug ./build
 ninja -C ./build
 ```
+If it fails to build, you are probably missing dependencies.
 
 Edit `./build/config/vkBasalt.json` and set `library_path` to the absolute path of the built library:
 ```json
