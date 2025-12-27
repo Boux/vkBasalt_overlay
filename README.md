@@ -33,6 +33,43 @@ you can change this keybinding in your `vkBasalt.conf` with `overlayKey = <key>`
 
 <img width="1920" height="961" alt="image" src="https://github.com/user-attachments/assets/cc2ff254-03a5-455b-8896-efedc0b28cdd" />
 
+## Fork-specific features
+
+### On master branch
+**Real-time config reloading**
+- Any modifications you do to your config file should apply instantly in-game without needing to re-open the game (too many modifications may or may not crash your game).
+
+### On feature/imgui or feature/ingui_stable branches
+**Toggle Overlay**
+- Press `F11` (default) to show/hide the overlay
+- Configurable via `overlayKey` in vkBasalt.conf
+
+**Effect Selection**
+- Click "Select Effects..." to open the effect picker
+- Effects are organized into three categories:
+  - **Built-in:** cas, dls, fxaa, smaa, deband, lut
+  - **ReShade (current config):** effects defined in your game-specific config
+  - **ReShade (all):** effects from your default vkBasalt.conf
+- Select up to 10 effects (configurable via `maxEffects`)
+
+**Effect Management**
+- **Reorder effects:** Drag the `::` handle to change effect order (affects rendering order)
+- **Enable/disable effects:** Toggle the checkbox next to each effect
+- **Edit parameters:** Expand an effect to see and modify its parameters (sliders, checkboxes, dropdowns)
+
+**Apply Changes**
+- Click "Apply" to apply your changes
+- Or enable "Apply automatically" for live preview (changes apply after 200ms debounce)
+
+#### Overlay Config Options
+
+Add these to your `vkBasalt.conf`:
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `overlayKey` | `F11` | Key to toggle the overlay |
+| `maxEffects` | `10` | Maximum number of effects that can be selected |
+
 ---
 # vkBasalt
 
