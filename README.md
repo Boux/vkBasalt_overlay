@@ -5,7 +5,7 @@ This is a fork with an experimental ImGui overlay for in-game effect configurati
 ```
 git clone https://github.com/Boux/vkBasalt_overlay.git
 cd vkBasalt_overlay
-git checkout feature/imgui
+git checkout feature/imgui_stable
 meson setup --buildtype=debug ./build
 ninja -C ./build
 ```
@@ -26,7 +26,7 @@ Steam game launch options (I have only tested with Tunic as of now)
 VK_ADD_IMPLICIT_LAYER_PATH=/path/to/vkBasalt_overlay/build/config ENABLE_VKBASALT=1 %command%
 ```
 
-You should then be able to press `F11` to show the overlay GUI in-game.
+You should then be able to press `F11` to show the overlay GUI in-game. If the GUI doesn't show up, the `library_path` is probably not set properly.
 you can change this keybinding in your `vkBasalt.conf` with `overlayKey = <key>`.
 
 **Warning** I have not tested with Nvidia, only AMD.
