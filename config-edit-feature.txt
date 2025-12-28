@@ -1,0 +1,9 @@
+- The user should be able to save the current active effects into a config file, with the effect params under it. take a look at example.conf.
+- The default config (vkBasalt.conf) can define defaults, so that game-specific configs (such as example.conf) shouldn't need to set these such as "reshadeTexturePath" and "reshadeIncludePath", or any effect definition such as "myCoolEffect = /path/to/myCoolEffect.fx". any game-specific config should be able to use whatever is defined in the base vkBasalt.conf by default.
+- THe game-specific configs CAN still override these values and they take precedence in these cases.
+- Any .fx file that is inside the reshadeIncludePath (recursively) should be available by default without defining them in the config (So if "whatever/../myEffect.fx" is found, it should show up as "myEffect" in the "all" section of the effect selector)
+- A user generated config file (with the overlay ui) should appear in a "configs" sub-folder, so in ~/.config/vkBasalt/configs
+- If there is no defined config form the env vars, the user should be able to define a default game config, so that it loads by default. if none is defined, it just uses whatever is configured in the vkBasalt.conf
+- When a config is serialized and saved, it should only save the uniform parameter values that differ from the default value from the effect file.
+- If there are parameters to save for multiple different effects, the blocks of effect parameters should be separated by newlines and a comment for each block.
+- The config serializer logic should be in its own file as to not bloat the rest of the codebase.

@@ -14,6 +14,7 @@ vkBasalt_src = [
     'buffer.cpp',
     'command_buffer.cpp',
     'config.cpp',
+    'config_serializer.cpp',
     'descriptor_set.cpp',
     'effect_cas.cpp',
     'effect.cpp',

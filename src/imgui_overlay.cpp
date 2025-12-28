@@ -1,6 +1,8 @@
 #include "imgui_overlay.hpp"
 #include "logger.hpp"
 #include "mouse_input.hpp"
+#include "keyboard_input.hpp"
+#include "config_serializer.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -365,6 +367,18 @@ namespace vkBasalt
         io.MouseWheel = mouse.scrollDelta;
         io.MouseDrawCursor = true;  // Draw software cursor (games often hide the OS cursor)
 
+        // Keyboard input for text fields
+        KeyboardState keyboard = getKeyboardState();
+        for (char c : keyboard.typedChars)
+            io.AddInputCharacter(c);
+        if (keyboard.backspace) io.AddKeyEvent(ImGuiKey_Backspace, true);
+        if (keyboard.del) io.AddKeyEvent(ImGuiKey_Delete, true);
+        if (keyboard.enter) io.AddKeyEvent(ImGuiKey_Enter, true);
+        if (keyboard.left) io.AddKeyEvent(ImGuiKey_LeftArrow, true);
+        if (keyboard.right) io.AddKeyEvent(ImGuiKey_RightArrow, true);
+        if (keyboard.home) io.AddKeyEvent(ImGuiKey_Home, true);
+        if (keyboard.end) io.AddKeyEvent(ImGuiKey_End, true);
+
         // ImGui frame
         ImGui_ImplVulkan_NewFrame();
         ImGui::NewFrame();
@@ -674,6 +688,57 @@ namespace vkBasalt
             // Save state when effects/params change
             if (changedThisFrame)
                 saveToPersistentState();
+
+            ImGui::Separator();
+
+            // Save Config UI
+            ImGui::Text("Save Config:");
+
+            // Initialize with current config name (without .conf extension)
+            static bool nameInitialized = false;
+            std::string currentName = state.configName;
+            if (currentName.size() > 5 && currentName.substr(currentName.size() - 5) == ".conf")
+                currentName = currentName.substr(0, currentName.size() - 5);
+            if (!nameInitialized && !currentName.empty())
+            {
+                strncpy(saveConfigName, currentName.c_str(), sizeof(saveConfigName) - 1);
+                nameInitialized = true;
+            }
+
+            // Text input for config name
+            ImGui::SetNextItemWidth(150);
+            ImGui::InputText("##configname", saveConfigName, sizeof(saveConfigName));
+
+            ImGui::SameLine();
+            if (ImGui::Button("Save"))
+            {
+                const char* nameToSave = saveConfigName[0] ? saveConfigName : currentName.c_str();
+                if (nameToSave[0] != '\0')
+                {
+                    // Collect params from editableParams
+                    std::vector<EffectParam> params;
+                    for (const auto& p : editableParams)
+                    {
+                        EffectParam ep;
+                        ep.effectName = p.effectName;
+                        ep.paramName = p.name;
+                        switch (p.type)
+                        {
+                        case ParamType::Float:
+                            ep.value = std::to_string(p.valueFloat);
+                            break;
+                        case ParamType::Int:
+                            ep.value = std::to_string(p.valueInt);
+                            break;
+                        case ParamType::Bool:
+                            ep.value = p.valueBool ? "true" : "false";
+                            break;
+                        }
+                        params.push_back(ep);
+                    }
+                    ConfigSerializer::saveConfig(nameToSave, selectedEffects, params);
+                }
+            }
         }
 
         ImGui::End();

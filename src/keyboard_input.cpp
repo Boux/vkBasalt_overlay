@@ -28,4 +28,12 @@ namespace vkBasalt
 #endif
         return false;
     }
+
+    KeyboardState getKeyboardState()
+    {
+#if VKBASALT_X11
+        return getKeyboardStateX11();
+#endif
+        return KeyboardState();
+    }
 } // namespace vkBasalt

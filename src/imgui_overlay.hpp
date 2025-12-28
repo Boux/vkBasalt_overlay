@@ -116,6 +116,7 @@ namespace vkBasalt
         bool visible = false;
         bool initialized = false;
         bool backendInitialized = false;
+        char saveConfigName[64] = "";
     };
 
 } // namespace vkBasalt
