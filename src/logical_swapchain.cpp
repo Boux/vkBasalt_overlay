@@ -1,5 +1,4 @@
 #include "logical_swapchain.hpp"
-#include "imgui_overlay.hpp"
 
 namespace vkBasalt
 {
@@ -37,8 +36,7 @@ namespace vkBasalt
             }
             imageViews.clear();
 
-            // Destroy ImGui overlay
-            imguiOverlay.reset();
+            // Note: ImGui overlay is now at device level, not destroyed here
         }
     }
 } // namespace vkBasalt

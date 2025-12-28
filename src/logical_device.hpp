@@ -13,6 +13,7 @@
 namespace vkBasalt
 {
     struct OverlayPersistentState;  // Forward declaration
+    class ImGuiOverlay;  // Forward declaration
 
     struct LogicalDevice
     {
@@ -31,6 +32,9 @@ namespace vkBasalt
 
         // Persistent overlay state that survives swapchain recreation
         std::unique_ptr<OverlayPersistentState> overlayPersistentState;
+
+        // ImGui overlay - lives at device level to survive swapchain recreation
+        std::unique_ptr<ImGuiOverlay> imguiOverlay;
     };
 } // namespace vkBasalt
 

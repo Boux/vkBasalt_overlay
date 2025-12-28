@@ -16,7 +16,6 @@
 namespace vkBasalt
 {
     class Config;
-    class ImGuiOverlay;
 
     // for each swapchain, we have the Images and the other stuff we need to execute the compute shader
     struct LogicalSwapchain
@@ -37,8 +36,6 @@ namespace vkBasalt
         std::vector<std::shared_ptr<Effect>> effects;
         std::shared_ptr<Effect>              defaultTransfer;
         VkDeviceMemory                       fakeImageMemory;
-
-        std::unique_ptr<ImGuiOverlay>        imguiOverlay;
 
         void destroy();
         void reloadEffects(Config* pConfig);

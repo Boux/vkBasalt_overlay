@@ -2,6 +2,7 @@
 
 #include <mutex>
 #include <map>
+#include <chrono>
 #include <vector>
 #include <unordered_map>
 #include <iostream>
@@ -86,6 +87,15 @@ namespace vkBasalt
         bool initialized = false;
     };
     CachedEffectsData cachedEffects;
+
+    // Debounce for resize - delays effect reload until resize stops
+    struct ResizeDebounceState
+    {
+        std::chrono::steady_clock::time_point lastResizeTime;
+        bool pending = false;
+    };
+    ResizeDebounceState resizeDebounce;
+    constexpr int64_t RESIZE_DEBOUNCE_MS = 200;
 
     // Helper function to get available effects separated by source (uses cache)
     void getAvailableEffects(Config* pConfig,
@@ -522,6 +532,10 @@ namespace vkBasalt
         Logger::trace("vkDestroyDevice");
 
         LogicalDevice* pLogicalDevice = deviceMap[GetKey(device)].get();
+
+        // Destroy ImGui overlay before device (it uses device resources)
+        pLogicalDevice->imguiOverlay.reset();
+
         if (pLogicalDevice->commandPool != VK_NULL_HANDLE)
         {
             Logger::debug("DestroyCommandPool");
@@ -648,6 +662,27 @@ namespace vkBasalt
             createFakeSwapchainImages(pLogicalDevice, pLogicalSwapchain->swapchainCreateInfo, fakeImageCount, pLogicalSwapchain->fakeImageMemory);
         Logger::debug("created fake swapchain images");
 
+        // If there's persisted state, skip expensive effect creation - use pass-through and debounce
+        bool hasPersisted = pLogicalDevice->overlayPersistentState &&
+                            pLogicalDevice->overlayPersistentState->initialized &&
+                            !pLogicalDevice->overlayPersistentState->selectedEffects.empty();
+
+        if (hasPersisted)
+        {
+            Logger::debug("using pass-through during resize, will restore effects after debounce");
+            // Create simple pass-through: first fake images -> swapchain images
+            std::vector<VkImage> firstImages(pLogicalSwapchain->fakeImages.begin(),
+                                             pLogicalSwapchain->fakeImages.begin() + pLogicalSwapchain->imageCount);
+            pLogicalSwapchain->effects.push_back(std::shared_ptr<Effect>(new TransferEffect(
+                pLogicalDevice, pLogicalSwapchain->format, pLogicalSwapchain->imageExtent,
+                firstImages, pLogicalSwapchain->images, pConfig.get())));
+
+            resizeDebounce.pending = true;
+            resizeDebounce.lastResizeTime = std::chrono::steady_clock::now();
+        }
+        else
+        {
+        // Normal effect creation from config
         VkFormat unormFormat = convertToUNORM(pLogicalSwapchain->format);
         VkFormat srgbFormat  = convertToSRGB(pLogicalSwapchain->format);
 
@@ -732,6 +767,7 @@ namespace vkBasalt
                 pLogicalSwapchain->images,
                 pConfig.get())));
         }
+        } // end else (normal effect creation)
 
         VkImageView depthImageView = pLogicalDevice->depthImageViews.size() ? pLogicalDevice->depthImageViews[0] : VK_NULL_HANDLE;
         VkImage     depthImage     = pLogicalDevice->depthImageViews.size() ? pLogicalDevice->depthImages[0] : VK_NULL_HANDLE;
@@ -779,12 +815,16 @@ namespace vkBasalt
             Logger::debug(std::to_string(i) + " written commandbuffer " + convertToString(pLogicalSwapchain->commandBuffersNoEffect[i]));
         }
 
-        // Create ImGui overlay with persistent state
-        if (!pLogicalDevice->overlayPersistentState)
-            pLogicalDevice->overlayPersistentState = std::make_unique<OverlayPersistentState>();
-        pLogicalSwapchain->imguiOverlay = std::make_unique<ImGuiOverlay>(
-            pLogicalDevice, pLogicalSwapchain->format, pLogicalSwapchain->imageCount,
-            pLogicalDevice->overlayPersistentState.get());
+        // Create ImGui overlay at device level (if not already created)
+        // This survives swapchain recreation during resize
+        if (!pLogicalDevice->imguiOverlay)
+        {
+            if (!pLogicalDevice->overlayPersistentState)
+                pLogicalDevice->overlayPersistentState = std::make_unique<OverlayPersistentState>();
+            pLogicalDevice->imguiOverlay = std::make_unique<ImGuiOverlay>(
+                pLogicalDevice, pLogicalSwapchain->format, pLogicalSwapchain->imageCount,
+                pLogicalDevice->overlayPersistentState.get());
+        }
 
         *pCount = std::min<uint32_t>(*pCount, pLogicalSwapchain->imageCount);
         std::memcpy(pSwapchainImages, pLogicalSwapchain->fakeImages.data(), sizeof(VkImage) * (*pCount));
@@ -854,11 +894,10 @@ namespace vkBasalt
         {
             if (!overlayPressed)
             {
-                for (auto& swapchainPair : swapchainMap)
-                {
-                    if (swapchainPair.second->imguiOverlay)
-                        swapchainPair.second->imguiOverlay->toggle();
-                }
+                // Overlay is now at device level
+                LogicalDevice* pDevice = deviceMap[GetKey(queue)].get();
+                if (pDevice->imguiOverlay)
+                    pDevice->imguiOverlay->toggle();
                 overlayPressed = true;
             }
         }
@@ -867,36 +906,33 @@ namespace vkBasalt
             overlayPressed = false;
         }
 
-        // Check for Apply button press in overlay
+        // Check for Apply button press in overlay (overlay is at device level)
         std::map<std::string, bool> effectEnabledStates;
-        for (auto& swapchainPair : swapchainMap)
+        LogicalDevice* pLogicalDevice = deviceMap[GetKey(queue)].get();
+        if (pLogicalDevice->imguiOverlay && pLogicalDevice->imguiOverlay->hasModifiedParams())
         {
-            if (swapchainPair.second->imguiOverlay && swapchainPair.second->imguiOverlay->hasModifiedParams())
+            Logger::info("Applying modified parameters from overlay");
+            auto params = pLogicalDevice->imguiOverlay->getModifiedParams();
+            for (const auto& param : params)
             {
-                Logger::info("Applying modified parameters from overlay");
-                auto params = swapchainPair.second->imguiOverlay->getModifiedParams();
-                for (const auto& param : params)
+                std::string valueStr;
+                switch (param.type)
                 {
-                    std::string valueStr;
-                    switch (param.type)
-                    {
-                    case ParamType::Float:
-                        valueStr = std::to_string(param.valueFloat);
-                        break;
-                    case ParamType::Int:
-                        valueStr = std::to_string(param.valueInt);
-                        break;
-                    case ParamType::Bool:
-                        valueStr = param.valueBool ? "true" : "false";
-                        break;
-                    }
-                    pConfig->setOverride(param.name, valueStr);
+                case ParamType::Float:
+                    valueStr = std::to_string(param.valueFloat);
+                    break;
+                case ParamType::Int:
+                    valueStr = std::to_string(param.valueInt);
+                    break;
+                case ParamType::Bool:
+                    valueStr = param.valueBool ? "true" : "false";
+                    break;
                 }
-                effectEnabledStates = swapchainPair.second->imguiOverlay->getEffectEnabledStates();
-                swapchainPair.second->imguiOverlay->clearApplyRequest();
-                shouldReload = true;
-                break;  // Only process once
+                pConfig->setOverride(param.name, valueStr);
             }
+            effectEnabledStates = pLogicalDevice->imguiOverlay->getEffectEnabledStates();
+            pLogicalDevice->imguiOverlay->clearApplyRequest();
+            shouldReload = true;
         }
 
         if (shouldReload)
@@ -905,25 +941,42 @@ namespace vkBasalt
             pConfig->reload();
             cachedEffects.initialized = false;  // Invalidate cache
 
+            // Get active effects from overlay (at device level)
+            std::vector<std::string> activeEffects;
+            if (pLogicalDevice->imguiOverlay)
+                activeEffects = pLogicalDevice->imguiOverlay->getActiveEffects();
+            else
+                activeEffects = pConfig->getOption<std::vector<std::string>>("effects", {"cas"});
+
             // Reload effects for all swapchains
             for (auto& swapchainPair : swapchainMap)
             {
                 LogicalSwapchain* pLogicalSwapchain = swapchainPair.second.get();
                 if (pLogicalSwapchain->fakeImages.size() > 0)
                 {
-                    // Get active effects from overlay (includes user-activated effects)
-                    std::vector<std::string> activeEffects;
-                    if (pLogicalSwapchain->imguiOverlay)
-                        activeEffects = pLogicalSwapchain->imguiOverlay->getActiveEffects();
-                    else
-                        activeEffects = pConfig->getOption<std::vector<std::string>>("effects", {"cas"});
-
                     reloadEffectsForSwapchain(pLogicalSwapchain, pConfig.get(), effectEnabledStates, activeEffects);
                 }
             }
         }
 
-        LogicalDevice* pLogicalDevice = deviceMap[GetKey(queue)].get();
+        // Check for debounced resize reload (separate from config reload)
+        auto resizeElapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - resizeDebounce.lastResizeTime).count();
+
+        if (resizeDebounce.pending && resizeElapsed >= RESIZE_DEBOUNCE_MS)
+        {
+            Logger::info("debounced resize reload after " + std::to_string(resizeElapsed) + "ms");
+            resizeDebounce.pending = false;
+
+            for (auto& [_, pSwapchain] : swapchainMap)
+            {
+                if (pSwapchain->fakeImages.empty() || !pLogicalDevice->overlayPersistentState)
+                    continue;
+                reloadEffectsForSwapchain(pSwapchain.get(), pConfig.get(),
+                    pLogicalDevice->overlayPersistentState->effectEnabledStates,
+                    pLogicalDevice->overlayPersistentState->selectedEffects);
+            }
+        }
 
         std::vector<VkSemaphore> presentSemaphores;
         presentSemaphores.reserve(pPresentInfo->swapchainCount);
@@ -960,12 +1013,12 @@ namespace vkBasalt
             // Default: wait on effects semaphore for present
             VkSemaphore finalSemaphore = pLogicalSwapchain->semaphores[index];
 
-            // Update overlay state and render if visible
-            if (pLogicalSwapchain->imguiOverlay)
+            // Update overlay state and render if visible (overlay is at device level)
+            if (pLogicalDevice->imguiOverlay)
             {
                 OverlayState overlayState;
                 // Use actual active effects from overlay, not just config effects
-                overlayState.effectNames = pLogicalSwapchain->imguiOverlay->getActiveEffects();
+                overlayState.effectNames = pLogicalDevice->imguiOverlay->getActiveEffects();
                 if (overlayState.effectNames.empty())
                     overlayState.effectNames = pConfig->getOption<std::vector<std::string>>("effects", {"cas"});
                 getAvailableEffects(pConfig.get(), overlayState.currentConfigEffects,
@@ -979,11 +1032,11 @@ namespace vkBasalt
                 overlayState.parameters = collectEffectParameters(
                     pConfig, overlayState.effectNames, pLogicalSwapchain->effects);
 
-                pLogicalSwapchain->imguiOverlay->updateState(overlayState);
+                pLogicalDevice->imguiOverlay->updateState(overlayState);
             }
 
-            VkCommandBuffer overlayCmd = pLogicalSwapchain->imguiOverlay
-                ? pLogicalSwapchain->imguiOverlay->recordFrame(index, pLogicalSwapchain->imageViews[index],
+            VkCommandBuffer overlayCmd = pLogicalDevice->imguiOverlay
+                ? pLogicalDevice->imguiOverlay->recordFrame(index, pLogicalSwapchain->imageViews[index],
                       pLogicalSwapchain->imageExtent.width, pLogicalSwapchain->imageExtent.height)
                 : VK_NULL_HANDLE;
 
