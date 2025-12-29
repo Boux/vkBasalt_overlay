@@ -741,6 +741,59 @@ namespace vkBasalt
                         dragSourceIndex = static_cast<int>(i);
                     }
                 }
+
+                // Right-click context menu
+                if (ImGui::BeginPopupContextItem("effect_context"))
+                {
+                    // Toggle ON/OFF
+                    if (ImGui::MenuItem(effectEnabled ? "Disable" : "Enable"))
+                    {
+                        if (pEffectRegistry)
+                            pEffectRegistry->setEffectEnabled(effectName, !effectEnabled);
+                        changedThisFrame = true;
+                        paramsDirty = true;
+                        lastChangeTime = std::chrono::steady_clock::now();
+                    }
+
+                    // Reset to defaults
+                    if (ImGui::MenuItem("Reset to Defaults"))
+                    {
+                        for (auto& param : editableParams)
+                        {
+                            if (param.effectName != effectName)
+                                continue;
+                            switch (param.type)
+                            {
+                            case ParamType::Float:
+                                param.valueFloat = param.defaultFloat;
+                                break;
+                            case ParamType::Int:
+                                param.valueInt = param.defaultInt;
+                                break;
+                            case ParamType::Bool:
+                                param.valueBool = param.defaultBool;
+                                break;
+                            }
+                        }
+                        changedThisFrame = true;
+                        paramsDirty = true;
+                        lastChangeTime = std::chrono::steady_clock::now();
+                    }
+
+                    ImGui::Separator();
+
+                    // Remove effect
+                    if (ImGui::MenuItem("Remove"))
+                    {
+                        selectedEffects.erase(selectedEffects.begin() + i);
+                        changedThisFrame = true;
+                        paramsDirty = true;
+                        lastChangeTime = std::chrono::steady_clock::now();
+                    }
+
+                    ImGui::EndPopup();
+                }
+
                 ImGui::PopID();
 
                 if (treeOpen)
