@@ -249,10 +249,21 @@ namespace vkBasalt
 
     void ImGuiOverlay::saveCurrentConfig()
     {
-        // Collect parameters
+        // Collect parameters that differ from defaults
         std::vector<EffectParam> params;
         for (const auto& p : editableParams)
         {
+            bool differs = false;
+            if (p.type == ParamType::Float)
+                differs = (p.valueFloat != p.defaultFloat);
+            else if (p.type == ParamType::Int)
+                differs = (p.valueInt != p.defaultInt);
+            else
+                differs = (p.valueBool != p.defaultBool);
+
+            if (!differs)
+                continue;
+
             EffectParam ep;
             ep.effectName = p.effectName;
             ep.paramName = p.name;

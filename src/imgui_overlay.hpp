@@ -31,6 +31,9 @@ namespace vkBasalt
         float valueFloat = 0.0f;
         int valueInt = 0;
         bool valueBool = false;
+        float defaultFloat = 0.0f;
+        int defaultInt = 0;
+        bool defaultBool = false;
         float minFloat = 0.0f;
         float maxFloat = 1.0f;
         int minInt = 0;
