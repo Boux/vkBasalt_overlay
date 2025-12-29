@@ -293,15 +293,28 @@ namespace vkBasalt
                 disabledEffects.push_back(effect);
         }
 
-        // Collect effect paths for ReShade effects (needed for instance names like "4xBRZ.2")
+        // Collect effect paths/types for serialization
+        // For ReShade: store file path (e.g., "Clarity.2 = /path/to/Clarity.fx")
+        // For built-in: store effect type (e.g., "cas.2 = cas")
         std::map<std::string, std::string> effectPaths;
         if (pEffectRegistry)
         {
             for (const auto& effectName : selectedEffects)
             {
-                std::string path = pEffectRegistry->getEffectFilePath(effectName);
-                if (!path.empty())
-                    effectPaths[effectName] = path;
+                if (pEffectRegistry->isEffectBuiltIn(effectName))
+                {
+                    // Built-in effect: store the type name
+                    std::string effectType = pEffectRegistry->getEffectType(effectName);
+                    if (!effectType.empty())
+                        effectPaths[effectName] = effectType;
+                }
+                else
+                {
+                    // ReShade effect: store the file path
+                    std::string path = pEffectRegistry->getEffectFilePath(effectName);
+                    if (!path.empty())
+                        effectPaths[effectName] = path;
+                }
             }
         }
 

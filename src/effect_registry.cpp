@@ -103,12 +103,23 @@ namespace vkBasalt
 
         for (const auto& name : effectNames)
         {
-            if (isBuiltInEffect(name))
+            // Check if there's a stored effect type/path for this effect
+            // Format: "cas.2 = cas" (built-in) or "Clarity = /path/to/Clarity.fx" (ReShade)
+            std::string storedValue = pConfig->getOption<std::string>(name, "");
+
+            if (!storedValue.empty() && isBuiltInEffect(storedValue))
             {
-                initBuiltInEffect(name);
+                // Stored value is a built-in type name (e.g., "cas.2 = cas")
+                initBuiltInEffect(name, storedValue);
+            }
+            else if (isBuiltInEffect(name))
+            {
+                // Effect name itself is a built-in (e.g., "cas")
+                initBuiltInEffect(name, name);
             }
             else
             {
+                // Try to find as ReShade effect
                 std::string effectPath = findEffectPath(name, pConfig);
                 if (effectPath.empty())
                 {
@@ -126,62 +137,64 @@ namespace vkBasalt
         Logger::debug("EffectRegistry: initialized " + std::to_string(effects.size()) + " effects");
     }
 
-    void EffectRegistry::initBuiltInEffect(const std::string& name)
+    void EffectRegistry::initBuiltInEffect(const std::string& instanceName, const std::string& effectType)
     {
         EffectConfig config;
-        config.name = name;
+        config.name = instanceName;
+        config.effectType = effectType;
         config.type = EffectType::BuiltIn;
         config.enabled = true;
 
-        if (name == "cas")
+        // Use effectType to determine params, but instanceName for param lookups
+        if (effectType == "cas")
         {
             config.parameters.push_back(
-                makeFloatParam("cas", "casSharpness", "Sharpness", 0.4f, 0.0f, 1.0f, pConfig));
+                makeFloatParam(instanceName, "casSharpness", "Sharpness", 0.4f, 0.0f, 1.0f, pConfig));
         }
-        else if (name == "dls")
+        else if (effectType == "dls")
         {
             config.parameters.push_back(
-                makeFloatParam("dls", "dlsSharpness", "Sharpness", 0.5f, 0.0f, 1.0f, pConfig));
+                makeFloatParam(instanceName, "dlsSharpness", "Sharpness", 0.5f, 0.0f, 1.0f, pConfig));
             config.parameters.push_back(
-                makeFloatParam("dls", "dlsDenoise", "Denoise", 0.17f, 0.0f, 1.0f, pConfig));
+                makeFloatParam(instanceName, "dlsDenoise", "Denoise", 0.17f, 0.0f, 1.0f, pConfig));
         }
-        else if (name == "fxaa")
+        else if (effectType == "fxaa")
         {
             config.parameters.push_back(
-                makeFloatParam("fxaa", "fxaaQualitySubpix", "Quality Subpix", 0.75f, 0.0f, 1.0f, pConfig));
+                makeFloatParam(instanceName, "fxaaQualitySubpix", "Quality Subpix", 0.75f, 0.0f, 1.0f, pConfig));
             config.parameters.push_back(
-                makeFloatParam("fxaa", "fxaaQualityEdgeThreshold", "Edge Threshold", 0.125f, 0.0f, 0.5f, pConfig));
+                makeFloatParam(instanceName, "fxaaQualityEdgeThreshold", "Edge Threshold", 0.125f, 0.0f, 0.5f, pConfig));
             config.parameters.push_back(
-                makeFloatParam("fxaa", "fxaaQualityEdgeThresholdMin", "Edge Threshold Min", 0.0312f, 0.0f, 0.1f, pConfig));
+                makeFloatParam(instanceName, "fxaaQualityEdgeThresholdMin", "Edge Threshold Min", 0.0312f, 0.0f, 0.1f, pConfig));
         }
-        else if (name == "smaa")
+        else if (effectType == "smaa")
         {
             config.parameters.push_back(
-                makeFloatParam("smaa", "smaaThreshold", "Threshold", 0.05f, 0.0f, 0.5f, pConfig));
+                makeFloatParam(instanceName, "smaaThreshold", "Threshold", 0.05f, 0.0f, 0.5f, pConfig));
             config.parameters.push_back(
-                makeIntParam("smaa", "smaaMaxSearchSteps", "Max Search Steps", 32, 0, 112, pConfig));
+                makeIntParam(instanceName, "smaaMaxSearchSteps", "Max Search Steps", 32, 0, 112, pConfig));
             config.parameters.push_back(
-                makeIntParam("smaa", "smaaMaxSearchStepsDiag", "Max Search Steps Diag", 16, 0, 20, pConfig));
+                makeIntParam(instanceName, "smaaMaxSearchStepsDiag", "Max Search Steps Diag", 16, 0, 20, pConfig));
             config.parameters.push_back(
-                makeIntParam("smaa", "smaaCornerRounding", "Corner Rounding", 25, 0, 100, pConfig));
+                makeIntParam(instanceName, "smaaCornerRounding", "Corner Rounding", 25, 0, 100, pConfig));
         }
-        else if (name == "deband")
+        else if (effectType == "deband")
         {
             config.parameters.push_back(
-                makeFloatParam("deband", "debandAvgdiff", "Avg Diff", 3.4f, 0.0f, 255.0f, pConfig));
+                makeFloatParam(instanceName, "debandAvgdiff", "Avg Diff", 3.4f, 0.0f, 255.0f, pConfig));
             config.parameters.push_back(
-                makeFloatParam("deband", "debandMaxdiff", "Max Diff", 6.8f, 0.0f, 255.0f, pConfig));
+                makeFloatParam(instanceName, "debandMaxdiff", "Max Diff", 6.8f, 0.0f, 255.0f, pConfig));
             config.parameters.push_back(
-                makeFloatParam("deband", "debandMiddiff", "Mid Diff", 3.3f, 0.0f, 255.0f, pConfig));
+                makeFloatParam(instanceName, "debandMiddiff", "Mid Diff", 3.3f, 0.0f, 255.0f, pConfig));
             config.parameters.push_back(
-                makeFloatParam("deband", "debandRange", "Range", 16.0f, 1.0f, 64.0f, pConfig));
+                makeFloatParam(instanceName, "debandRange", "Range", 16.0f, 1.0f, 64.0f, pConfig));
             config.parameters.push_back(
-                makeIntParam("deband", "debandIterations", "Iterations", 4, 1, 16, pConfig));
+                makeIntParam(instanceName, "debandIterations", "Iterations", 4, 1, 16, pConfig));
         }
-        else if (name == "lut")
+        else if (effectType == "lut")
         {
             EffectParameter p;
-            p.effectName = "lut";
+            p.effectName = instanceName;
             p.name = "lutFile";
             p.label = "LUT File";
             p.type = ParamType::Float;
@@ -200,6 +213,10 @@ namespace vkBasalt
         config.type = EffectType::ReShade;
         config.enabled = true;
         config.parameters = parseReshadeEffect(name, path, pConfig);
+
+        // Extract effectType from filename (e.g., "/path/to/Clarity.fx" -> "Clarity")
+        std::filesystem::path p(path);
+        config.effectType = p.stem().string();
 
         effects.push_back(config);
         Logger::debug("EffectRegistry: loaded ReShade effect " + name + " with " +
@@ -376,6 +393,20 @@ namespace vkBasalt
         return effect ? effect->filePath : "";
     }
 
+    std::string EffectRegistry::getEffectType(const std::string& name) const
+    {
+        std::lock_guard<std::mutex> lock(mutex);
+        const EffectConfig* effect = findEffect(name);
+        return effect ? effect->effectType : "";
+    }
+
+    bool EffectRegistry::isEffectBuiltIn(const std::string& name) const
+    {
+        std::lock_guard<std::mutex> lock(mutex);
+        const EffectConfig* effect = findEffect(name);
+        return effect ? (effect->type == EffectType::BuiltIn) : false;
+    }
+
     void EffectRegistry::ensureEffect(const std::string& instanceName, const std::string& effectType)
     {
         {
@@ -389,7 +420,7 @@ namespace vkBasalt
 
         if (isBuiltInEffect(type))
         {
-            initBuiltInEffect(instanceName);
+            initBuiltInEffect(instanceName, type);
             return;
         }
 

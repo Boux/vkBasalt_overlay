@@ -63,13 +63,19 @@ namespace vkBasalt
         // Get the file path for an effect (for ReShade effects)
         std::string getEffectFilePath(const std::string& name) const;
 
+        // Get the effect type for an effect (base type name, e.g., "cas" for "cas.2")
+        std::string getEffectType(const std::string& name) const;
+
+        // Check if an effect is a built-in effect (by instance name)
+        bool isEffectBuiltIn(const std::string& name) const;
+
     private:
         std::vector<EffectConfig> effects;
         Config* pConfig = nullptr;
         mutable std::mutex mutex;
 
         // Initialize built-in effect configs
-        void initBuiltInEffect(const std::string& name);
+        void initBuiltInEffect(const std::string& instanceName, const std::string& effectType);
 
         // Initialize ReShade effect config
         void initReshadeEffect(const std::string& name, const std::string& path);
