@@ -106,6 +106,18 @@ namespace vkBasalt
     {
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
+
+        // Set imgui.ini path to config directory instead of game's working directory
+        static std::string iniPath;
+        if (iniPath.empty())
+        {
+            std::string baseDir = ConfigSerializer::getBaseConfigDir();
+            if (!baseDir.empty())
+                iniPath = baseDir + "/imgui.ini";
+        }
+        if (!iniPath.empty())
+            ImGui::GetIO().IniFilename = iniPath.c_str();
+
         ImGui::StyleColorsDark();
 
         // Make it semi-transparent

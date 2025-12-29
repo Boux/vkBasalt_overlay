@@ -10,13 +10,25 @@
 
 namespace vkBasalt
 {
-    std::string ConfigSerializer::getConfigsDir()
+    std::string ConfigSerializer::getBaseConfigDir()
     {
-        std::string configDir;
+        const char* xdgConfig = std::getenv("XDG_CONFIG_HOME");
+        if (xdgConfig)
+            return std::string(xdgConfig) + "/vkBasalt";
+
         const char* home = std::getenv("HOME");
         if (home)
-            configDir = std::string(home) + "/.config/vkBasalt/configs";
-        return configDir;
+            return std::string(home) + "/.config/vkBasalt";
+
+        return "";
+    }
+
+    std::string ConfigSerializer::getConfigsDir()
+    {
+        std::string baseDir = getBaseConfigDir();
+        if (baseDir.empty())
+            return "";
+        return baseDir + "/configs";
     }
 
     std::vector<std::string> ConfigSerializer::listConfigs()

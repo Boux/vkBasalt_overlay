@@ -27,7 +27,10 @@ namespace vkBasalt
             const std::vector<std::string>& disabledEffects,
             const std::vector<EffectParam>& params);
 
-        // Get the configs directory path
+        // Get the base config directory path (~/.config/vkBasalt/)
+        static std::string getBaseConfigDir();
+
+        // Get the configs directory path (~/.config/vkBasalt/configs/)
         static std::string getConfigsDir();
 
         // List available config files
