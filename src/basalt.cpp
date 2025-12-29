@@ -1143,25 +1143,25 @@ namespace vkBasalt
             if (pLogicalDevice->imguiOverlay && pLogicalDevice->imguiOverlay->isVisible())
             {
                 OverlayState overlayState;
-                // Use actual active effects from overlay, not just config effects
+                // Use active effects for display, but collect params for ALL selected effects
                 overlayState.effectNames = pLogicalDevice->imguiOverlay->getActiveEffects();
                 if (overlayState.effectNames.empty())
                     overlayState.effectNames = pConfig->getOption<std::vector<std::string>>("effects", {"cas"});
                 getAvailableEffects(pConfig.get(), overlayState.currentConfigEffects,
                                     overlayState.defaultConfigEffects, overlayState.effectPaths);
                 overlayState.configPath = pConfig->getConfigFilePath();
-                // Extract just the filename from the path
                 overlayState.configName = std::filesystem::path(overlayState.configPath).filename().string();
                 overlayState.effectsEnabled = presentEffect;
 
-                // Only recollect parameters when dirty or effects changed
-                bool effectsChanged = cachedParams.effectNames != overlayState.effectNames;
+                // Collect parameters for ALL selected effects (including disabled)
+                const auto& allSelectedEffects = pLogicalDevice->imguiOverlay->getSelectedEffects();
+                bool effectsChanged = cachedParams.effectNames != allSelectedEffects;
                 bool configChanged = cachedParams.configPath != overlayState.configPath;
                 if (cachedParams.dirty || effectsChanged || configChanged)
                 {
                     cachedParams.parameters = collectEffectParameters(
-                        pConfig, overlayState.effectNames, pLogicalSwapchain->effects);
-                    cachedParams.effectNames = overlayState.effectNames;
+                        pConfig, allSelectedEffects, pLogicalSwapchain->effects);
+                    cachedParams.effectNames = allSelectedEffects;
                     cachedParams.configPath = overlayState.configPath;
                     cachedParams.dirty = false;
                 }

@@ -87,8 +87,11 @@ namespace vkBasalt
         // Returns map of effect name -> enabled state
         const std::map<std::string, bool>& getEffectEnabledStates() const { return effectEnabledStates; }
 
-        // Returns list of effects that should be active (for reloading)
+        // Returns list of effects that should be active (enabled, for reloading)
         std::vector<std::string> getActiveEffects() const;
+
+        // Returns all selected effects (enabled + disabled, for parameter collection)
+        const std::vector<std::string>& getSelectedEffects() const { return selectedEffects; }
 
         // Set effects list (when loading a different config)
         // disabledEffects: effects that should be unchecked (in list but not rendered)

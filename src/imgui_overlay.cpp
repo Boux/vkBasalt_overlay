@@ -181,30 +181,36 @@ namespace vkBasalt
                 effectEnabledStates[effectName] = true;
         }
 
-        // Sync editable params with new state
-        // If params changed (different effect list), reset editableParams
-        if (editableParams.size() != state.parameters.size())
+        // Merge new parameters with existing ones
+        // Keep existing params for effects that are still selected but not in new params
+        // (happens when ReShade effects are disabled - they're not loaded so no params returned)
+        for (const auto& newParam : state.parameters)
         {
-            editableParams = state.parameters;
-            return;
+            // Find existing param with same effect and name
+            bool found = false;
+            for (auto& existingParam : editableParams)
+            {
+                if (existingParam.effectName != newParam.effectName || existingParam.name != newParam.name)
+                    continue;
+                // Update min/max but keep user-edited value
+                existingParam.minFloat = newParam.minFloat;
+                existingParam.maxFloat = newParam.maxFloat;
+                existingParam.minInt = newParam.minInt;
+                existingParam.maxInt = newParam.maxInt;
+                found = true;
+                break;
+            }
+            if (!found)
+                editableParams.push_back(newParam);
         }
 
-        // Check if params match, update values from state if not modified by user
-        for (size_t i = 0; i < state.parameters.size(); i++)
-        {
-            if (editableParams[i].name != state.parameters[i].name ||
-                editableParams[i].effectName != state.parameters[i].effectName)
-            {
-                // Params don't match, reset
-                editableParams = state.parameters;
-                return;
-            }
-            // Keep editable values, but update min/max from state
-            editableParams[i].minFloat = state.parameters[i].minFloat;
-            editableParams[i].maxFloat = state.parameters[i].maxFloat;
-            editableParams[i].minInt = state.parameters[i].minInt;
-            editableParams[i].maxInt = state.parameters[i].maxInt;
-        }
+        // Remove params for effects that are no longer selected
+        editableParams.erase(
+            std::remove_if(editableParams.begin(), editableParams.end(),
+                [this](const EffectParameter& p) {
+                    return std::find(selectedEffects.begin(), selectedEffects.end(), p.effectName) == selectedEffects.end();
+                }),
+            editableParams.end());
     }
 
     std::vector<EffectParameter> ImGuiOverlay::getModifiedParams()
