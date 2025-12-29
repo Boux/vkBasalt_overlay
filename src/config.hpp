@@ -16,8 +16,12 @@ namespace vkBasalt
     class Config
     {
     public:
-        Config(bool ignoreEnvVar = false);
+        Config();  // Finds and loads vkBasalt.conf
+        Config(const std::string& path);  // Loads specific config file
         Config(const Config& other);
+
+        // Set a fallback config for options not found in this config
+        void setFallback(Config* fallback) { pFallback = fallback; }
 
         template<typename T>
         T getOption(const std::string& option, const T& defaultValue = {})
@@ -31,9 +35,19 @@ namespace vkBasalt
                 return result;
             }
 
-            T result = defaultValue;
-            parseOption(option, result);
-            return result;
+            // Check this config's options
+            if (options.find(option) != options.end())
+            {
+                T result = defaultValue;
+                parseOption(option, result);
+                return result;
+            }
+
+            // Check fallback config if set
+            if (pFallback)
+                return pFallback->getOption(option, defaultValue);
+
+            return defaultValue;
         }
 
         // In-memory override support (does not modify config file)
@@ -54,6 +68,7 @@ namespace vkBasalt
         std::unordered_map<std::string, std::string> overrides;  // In-memory overrides
         std::string                                  configFilePath;
         time_t                                       lastModifiedTime = 0;
+        Config*                                      pFallback = nullptr;
 
         void readConfigLine(std::string line);
         void readConfigFile(std::ifstream& stream);

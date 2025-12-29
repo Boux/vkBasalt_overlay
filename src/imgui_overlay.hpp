@@ -14,6 +14,7 @@
 namespace vkBasalt
 {
     class Effect;
+    class EffectRegistry;
 
     enum class ParamType
     {
@@ -31,6 +32,9 @@ namespace vkBasalt
         float valueFloat = 0.0f;
         int valueInt = 0;
         bool valueBool = false;
+        float defaultFloat = 0.0f;
+        int defaultInt = 0;
+        bool defaultBool = false;
         float minFloat = 0.0f;
         float maxFloat = 1.0f;
         int minInt = 0;
@@ -38,11 +42,13 @@ namespace vkBasalt
         float step = 0.0f;                    // ui_step - increment step for sliders
         std::string uiType;                   // ui_type - "slider", "drag", "combo", etc.
         std::vector<std::string> items;       // ui_items - combo box options
+        std::string tooltip;                  // ui_tooltip - hover description
     };
 
     struct OverlayState
     {
         std::vector<std::string> effectNames;           // Effects in current config
+        std::vector<std::string> disabledEffects;       // Effects that are unchecked (in list but not rendered)
         std::vector<std::string> currentConfigEffects;  // ReShade effects from current config (e.g., tunic.conf)
         std::vector<std::string> defaultConfigEffects;  // ReShade effects from default vkBasalt.conf (no duplicates)
         std::map<std::string, std::string> effectPaths; // Effect name -> file path (for reshade effects)
@@ -56,9 +62,8 @@ namespace vkBasalt
     struct OverlayPersistentState
     {
         std::vector<std::string> selectedEffects;
-        std::map<std::string, bool> effectEnabledStates;
         std::vector<EffectParameter> editableParams;
-        bool autoApply = false;
+        bool autoApply = true;
         bool visible = false;
         bool initialized = false;  // True once user has interacted with overlay
     };
@@ -79,20 +84,42 @@ namespace vkBasalt
         bool hasModifiedParams() const { return applyRequested; }
         void clearApplyRequest() { applyRequested = false; }
 
-        // Returns map of effect name -> enabled state
-        const std::map<std::string, bool>& getEffectEnabledStates() const { return effectEnabledStates; }
+        // Config switching
+        bool hasPendingConfig() const { return !pendingConfigPath.empty(); }
+        std::string getPendingConfigPath() const { return pendingConfigPath; }
+        void clearPendingConfig() { pendingConfigPath.clear(); }
 
-        // Returns list of effects that should be active (for reloading)
+        // Effects toggle (global on/off)
+        bool hasToggleEffectsRequest() const { return toggleEffectsRequested; }
+        void clearToggleEffectsRequest() { toggleEffectsRequested = false; }
+
+        // Set the effect registry (single source of truth for enabled states)
+        void setEffectRegistry(EffectRegistry* registry) { pEffectRegistry = registry; }
+
+        // Trigger debounced reload (for config switch)
+        void markDirty() { paramsDirty = true; lastChangeTime = std::chrono::steady_clock::now(); }
+
+        // Returns list of effects that should be active (enabled, for reloading)
         std::vector<std::string> getActiveEffects() const;
+
+        // Returns all selected effects (enabled + disabled, for parameter collection)
+        const std::vector<std::string>& getSelectedEffects() const { return selectedEffects; }
+
+        // Set effects list (when loading a different config)
+        // disabledEffects: effects that should be unchecked (in list but not rendered)
+        void setSelectedEffects(const std::vector<std::string>& effects,
+                                const std::vector<std::string>& disabledEffects = {});
 
         VkCommandBuffer recordFrame(uint32_t imageIndex, VkImageView imageView, uint32_t width, uint32_t height);
 
     private:
         void initVulkanBackend(VkFormat swapchainFormat, uint32_t imageCount);
         void saveToPersistentState();
+        void saveCurrentConfig();
 
         LogicalDevice* pLogicalDevice;
         OverlayPersistentState* pPersistentState;
+        EffectRegistry* pEffectRegistry = nullptr;  // Single source of truth for enabled states
         VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
         VkRenderPass renderPass = VK_NULL_HANDLE;
         VkCommandPool commandPool = VK_NULL_HANDLE;
@@ -101,21 +128,25 @@ namespace vkBasalt
         uint32_t imageCount = 0;
         OverlayState state;
         std::vector<EffectParameter> editableParams;  // Persistent editable values
-        std::map<std::string, bool> effectEnabledStates;  // Effect name -> enabled
         std::vector<std::string> selectedEffects;           // Effects user has selected (ordered)
         std::vector<std::string> tempSelectedEffects;       // Temporary selection while in selection mode
         bool inSelectionMode = false;
+        bool inConfigManageMode = false;
+        std::vector<std::string> configList;
         size_t maxEffects = 10;
         int dragSourceIndex = -1;   // Index of effect being dragged, -1 if none
         int dragTargetIndex = -1;   // Index where effect will be dropped
         bool isDragging = false;    // True while actively dragging
         bool applyRequested = false;
-        bool autoApply = false;
+        bool toggleEffectsRequested = false;
+        bool autoApply = true;
         bool paramsDirty = false;  // True when params changed, waiting for debounce
         std::chrono::steady_clock::time_point lastChangeTime;
         bool visible = false;
         bool initialized = false;
         bool backendInitialized = false;
+        char saveConfigName[64] = "";
+        std::string pendingConfigPath;
     };
 
 } // namespace vkBasalt

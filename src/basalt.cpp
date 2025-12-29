@@ -2,6 +2,7 @@
 
 #include <mutex>
 #include <map>
+#include <set>
 #include <chrono>
 #include <vector>
 #include <unordered_map>
@@ -10,6 +11,7 @@
 #include <memory>
 #include <cstring>
 #include <filesystem>
+#include <algorithm>
 
 #include "util.hpp"
 #include "keyboard_input.hpp"
@@ -26,6 +28,7 @@
 #include "command_buffer.hpp"
 #include "buffer.hpp"
 #include "config.hpp"
+#include "config_serializer.hpp"
 #include "fake_swapchain.hpp"
 #include "renderpass.hpp"
 #include "format.hpp"
@@ -42,6 +45,7 @@
 #include "effect_transfer.hpp"
 #include "imgui_overlay.hpp"
 #include "effect_params.hpp"
+#include "effect_registry.hpp"
 
 #define VKBASALT_NAME "VK_LAYER_VKBASALT_post_processing"
 
@@ -53,7 +57,9 @@
 
 namespace vkBasalt
 {
-    std::shared_ptr<Config> pConfig = nullptr;
+    std::shared_ptr<Config> pBaseConfig = nullptr;  // Always vkBasalt.conf
+    std::shared_ptr<Config> pConfig = nullptr;      // Current config (base + overlay)
+    EffectRegistry effectRegistry;                   // Single source of truth for effect configs
 
     Logger Logger::s_instance;
 
@@ -88,6 +94,16 @@ namespace vkBasalt
     };
     CachedEffectsData cachedEffects;
 
+    // Cached parameters (to avoid re-parsing config every frame)
+    struct CachedParametersData
+    {
+        std::vector<EffectParameter> parameters;
+        std::vector<std::string> effectNames;  // Effects when params were collected
+        std::string configPath;
+        bool dirty = true;  // Set to true to force recollection
+    };
+    CachedParametersData cachedParams;
+
     // Debounce for resize - delays effect reload until resize stops
     struct ResizeDebounceState
     {
@@ -96,6 +112,76 @@ namespace vkBasalt
     };
     ResizeDebounceState resizeDebounce;
     constexpr int64_t RESIZE_DEBOUNCE_MS = 200;
+
+    // Initialize configs: base (vkBasalt.conf) + current (from env/default_config)
+    void initConfigs()
+    {
+        if (pBaseConfig != nullptr)
+            return;  // Already initialized
+
+        // Load base config (vkBasalt.conf) - used for paths, effect definitions
+        pBaseConfig = std::make_shared<Config>();
+
+        // Determine current config path
+        std::string currentConfigPath;
+
+        // 1. Check env var
+        const char* envConfig = std::getenv("VKBASALT_CONFIG_FILE");
+        if (envConfig && *envConfig)
+        {
+            currentConfigPath = envConfig;
+        }
+        // 2. Check default_config file
+        else
+        {
+            std::string defaultName = ConfigSerializer::getDefaultConfig();
+            if (!defaultName.empty())
+                currentConfigPath = ConfigSerializer::getConfigsDir() + "/" + defaultName + ".conf";
+        }
+
+        // Load current config if specified, otherwise use base
+        if (!currentConfigPath.empty())
+        {
+            std::ifstream file(currentConfigPath);
+            if (file.good())
+            {
+                pConfig = std::make_shared<Config>(currentConfigPath);
+                pConfig->setFallback(pBaseConfig.get());
+                Logger::info("current config: " + currentConfigPath);
+            }
+            else
+            {
+                pConfig = pBaseConfig;  // Fall back to base
+            }
+        }
+        else
+        {
+            pConfig = pBaseConfig;  // No current config, use base
+        }
+
+        // Initialize effect registry with current config
+        effectRegistry.initialize(pConfig.get());
+    }
+
+    // Switch to a new config (called from overlay)
+    void switchConfig(const std::string& configPath)
+    {
+        Logger::info("switching to config: " + configPath);
+
+        // Create new config from file (starts with no overrides)
+        pConfig = std::make_shared<Config>(configPath);
+        pConfig->setFallback(pBaseConfig.get());
+
+        // Also clear any overrides on the base config to avoid stale values
+        if (pBaseConfig)
+            pBaseConfig->clearOverrides();
+
+        // Re-initialize registry with new config
+        effectRegistry.initialize(pConfig.get());
+        cachedParams.dirty = true;
+
+        Logger::info("switched to config: " + configPath);
+    }
 
     // Helper function to get available effects separated by source (uses cache)
     void getAvailableEffects(Config* pConfig,
@@ -116,27 +202,67 @@ namespace vkBasalt
         defaultConfigEffects.clear();
         effectPaths.clear();
 
+        // Collect all known effect names (to avoid duplicates)
+        std::set<std::string> knownEffects;
+
         // Get effect definitions from current config
         auto configEffects = pConfig->getEffectDefinitions();
         for (const auto& [name, path] : configEffects)
         {
             currentConfigEffects.push_back(name);
             effectPaths[name] = path;
+            knownEffects.insert(name);
         }
 
-        // Also load effect definitions from the default config file (ignoring VKBASALT_CONFIG_FILE env var)
-        Config defaultConfig(true);
-        if (defaultConfig.getConfigFilePath() != pConfig->getConfigFilePath())
+        // Also load effect definitions from the base config file (vkBasalt.conf)
+        if (pBaseConfig && pBaseConfig->getConfigFilePath() != pConfig->getConfigFilePath())
         {
-            auto defaultEffects = defaultConfig.getEffectDefinitions();
+            auto defaultEffects = pBaseConfig->getEffectDefinitions();
             for (const auto& [name, path] : defaultEffects)
             {
-                // Only add if not already in current config
-                if (std::find(currentConfigEffects.begin(), currentConfigEffects.end(), name) == currentConfigEffects.end())
+                if (knownEffects.find(name) == knownEffects.end())
                 {
                     defaultConfigEffects.push_back(name);
                     effectPaths[name] = path;
+                    knownEffects.insert(name);
                 }
+            }
+        }
+
+        // Auto-discover .fx files in reshadeIncludePath
+        std::string includePath = pBaseConfig ? pBaseConfig->getOption<std::string>("reshadeIncludePath", "")
+                                              : pConfig->getOption<std::string>("reshadeIncludePath", "");
+        if (!includePath.empty())
+        {
+            try
+            {
+                for (const auto& entry : std::filesystem::directory_iterator(includePath))
+                {
+                    if (!entry.is_regular_file())
+                        continue;
+
+                    std::string filename = entry.path().filename().string();
+                    if (filename.size() < 4 || filename.substr(filename.size() - 3) != ".fx")
+                        continue;
+
+                    // Effect name is filename without .fx extension
+                    std::string effectName = filename.substr(0, filename.size() - 3);
+
+                    // Skip if already known (from config definitions)
+                    if (knownEffects.find(effectName) != knownEffects.end())
+                        continue;
+
+                    defaultConfigEffects.push_back(effectName);
+                    effectPaths[effectName] = entry.path().string();
+                    knownEffects.insert(effectName);
+                }
+
+                // Sort discovered effects alphabetically
+                std::sort(defaultConfigEffects.begin(), defaultConfigEffects.end());
+            }
+            catch (const std::filesystem::filesystem_error& e)
+            {
+                Logger::warn("failed to scan reshadeIncludePath: " + std::string(e.what()));
             }
         }
 
@@ -150,7 +276,6 @@ namespace vkBasalt
 
     // Helper function to reload effects for a swapchain (for hot-reload)
     void reloadEffectsForSwapchain(LogicalSwapchain* pLogicalSwapchain, Config* pConfig,
-                                   const std::map<std::string, bool>& effectEnabledStates = {},
                                    const std::vector<std::string>& activeEffects = {})
     {
         LogicalDevice* pLogicalDevice = pLogicalSwapchain->pLogicalDevice;
@@ -212,8 +337,8 @@ namespace vkBasalt
             }
 
             // Check if effect is disabled - if so, use TransferEffect to pass through
-            auto enabledIt = effectEnabledStates.find(effectStrings[i]);
-            bool effectEnabled = (enabledIt == effectEnabledStates.end()) || enabledIt->second;
+            // Use global effectRegistry as single source of truth
+            bool effectEnabled = effectRegistry.isEffectEnabled(effectStrings[i]);
             if (!effectEnabled)
             {
                 Logger::debug("effect disabled, using pass-through: " + effectStrings[i]);
@@ -648,6 +773,15 @@ namespace vkBasalt
         }
 
         std::vector<std::string> effectStrings = pConfig->getOption<std::vector<std::string>>("effects", {"cas"});
+        std::vector<std::string> disabledEffects = pConfig->getOption<std::vector<std::string>>("disabledEffects", {});
+
+        // Filter out disabled effects
+        effectStrings.erase(
+            std::remove_if(effectStrings.begin(), effectStrings.end(),
+                [&disabledEffects](const std::string& effect) {
+                    return std::find(disabledEffects.begin(), disabledEffects.end(), effect) != disabledEffects.end();
+                }),
+            effectStrings.end());
 
         // Allow dynamic effect loading by allocating for more effects than configured
         // maxEffects defaults to 10, allowing users to enable additional effects at runtime
@@ -824,6 +958,8 @@ namespace vkBasalt
             pLogicalDevice->imguiOverlay = std::make_unique<ImGuiOverlay>(
                 pLogicalDevice, pLogicalSwapchain->format, pLogicalSwapchain->imageCount,
                 pLogicalDevice->overlayPersistentState.get());
+            // Set the effect registry pointer (single source of truth for enabled states)
+            pLogicalDevice->imguiOverlay->setEffectRegistry(&effectRegistry);
         }
 
         *pCount = std::min<uint32_t>(*pCount, pLogicalSwapchain->imageCount);
@@ -851,7 +987,7 @@ namespace vkBasalt
             initLogged = true;
         }
 
-        // Toggle effect on/off
+        // Toggle effect on/off (keyboard)
         if (isKeyPressed(keySymbol))
         {
             if (!pressed)
@@ -907,30 +1043,44 @@ namespace vkBasalt
         }
 
         // Check for Apply button press in overlay (overlay is at device level)
-        std::map<std::string, bool> effectEnabledStates;
         LogicalDevice* pLogicalDevice = deviceMap[GetKey(queue)].get();
+
+        // Toggle effects on/off via overlay checkbox
+        if (pLogicalDevice->imguiOverlay && pLogicalDevice->imguiOverlay->hasToggleEffectsRequest())
+        {
+            presentEffect = !presentEffect;
+            pLogicalDevice->imguiOverlay->clearToggleEffectsRequest();
+        }
+
         if (pLogicalDevice->imguiOverlay && pLogicalDevice->imguiOverlay->hasModifiedParams())
         {
-            Logger::info("Applying modified parameters from overlay");
-            auto params = pLogicalDevice->imguiOverlay->getModifiedParams();
-            for (const auto& param : params)
+            // If we're loading a new config, don't apply old params - just trigger reload
+            bool loadingNewConfig = pLogicalDevice->imguiOverlay->hasPendingConfig();
+
+            if (!loadingNewConfig)
             {
-                std::string valueStr;
-                switch (param.type)
+                Logger::info("Applying modified parameters from overlay");
+                auto params = pLogicalDevice->imguiOverlay->getModifiedParams();
+                for (const auto& param : params)
                 {
-                case ParamType::Float:
-                    valueStr = std::to_string(param.valueFloat);
-                    break;
-                case ParamType::Int:
-                    valueStr = std::to_string(param.valueInt);
-                    break;
-                case ParamType::Bool:
-                    valueStr = param.valueBool ? "true" : "false";
-                    break;
+                    std::string valueStr;
+                    switch (param.type)
+                    {
+                    case ParamType::Float:
+                        valueStr = std::to_string(param.valueFloat);
+                        break;
+                    case ParamType::Int:
+                        valueStr = std::to_string(param.valueInt);
+                        break;
+                    case ParamType::Bool:
+                        valueStr = param.valueBool ? "true" : "false";
+                        break;
+                    }
+                    pConfig->setOverride(param.name, valueStr);
                 }
-                pConfig->setOverride(param.name, valueStr);
             }
-            effectEnabledStates = pLogicalDevice->imguiOverlay->getEffectEnabledStates();
+
+            // Effect enabled states are now in the global effectRegistry (single source of truth)
             pLogicalDevice->imguiOverlay->clearApplyRequest();
             shouldReload = true;
         }
@@ -938,23 +1088,36 @@ namespace vkBasalt
         if (shouldReload)
         {
             Logger::info("hot-reloading config and effects...");
-            pConfig->reload();
-            cachedEffects.initialized = false;  // Invalidate cache
 
-            // Get active effects from overlay (at device level)
-            std::vector<std::string> activeEffects;
-            if (pLogicalDevice->imguiOverlay)
-                activeEffects = pLogicalDevice->imguiOverlay->getActiveEffects();
-            else
-                activeEffects = pConfig->getOption<std::vector<std::string>>("effects", {"cas"});
-
-            // Reload effects for all swapchains
-            for (auto& swapchainPair : swapchainMap)
+            // Check if overlay wants to load a different config
+            if (pLogicalDevice->imguiOverlay && pLogicalDevice->imguiOverlay->hasPendingConfig())
             {
-                LogicalSwapchain* pLogicalSwapchain = swapchainPair.second.get();
-                if (pLogicalSwapchain->fakeImages.size() > 0)
+                std::string newConfigPath = pLogicalDevice->imguiOverlay->getPendingConfigPath();
+                switchConfig(newConfigPath);
+                // Update overlay with effects and disabled effects from the new config
+                std::vector<std::string> newEffects = pConfig->getOption<std::vector<std::string>>("effects", {});
+                std::vector<std::string> disabledEffects = pConfig->getOption<std::vector<std::string>>("disabledEffects", {});
+                pLogicalDevice->imguiOverlay->setSelectedEffects(newEffects, disabledEffects);
+                pLogicalDevice->imguiOverlay->clearPendingConfig();
+                pLogicalDevice->imguiOverlay->markDirty();  // Defer reload via debounce
+            }
+            else
+            {
+                pConfig->reload();
+                cachedEffects.initialized = false;
+                cachedParams.dirty = true;
+
+                std::vector<std::string> activeEffects;
+                if (pLogicalDevice->imguiOverlay)
+                    activeEffects = pLogicalDevice->imguiOverlay->getActiveEffects();
+                else
+                    activeEffects = pConfig->getOption<std::vector<std::string>>("effects", {"cas"});
+
+                for (auto& swapchainPair : swapchainMap)
                 {
-                    reloadEffectsForSwapchain(pLogicalSwapchain, pConfig.get(), effectEnabledStates, activeEffects);
+                    LogicalSwapchain* pLogicalSwapchain = swapchainPair.second.get();
+                    if (pLogicalSwapchain->fakeImages.size() > 0)
+                        reloadEffectsForSwapchain(pLogicalSwapchain, pConfig.get(), activeEffects);
                 }
             }
         }
@@ -972,8 +1135,8 @@ namespace vkBasalt
             {
                 if (pSwapchain->fakeImages.empty() || !pLogicalDevice->overlayPersistentState)
                     continue;
+                // Effect enabled states are read from global effectRegistry
                 reloadEffectsForSwapchain(pSwapchain.get(), pConfig.get(),
-                    pLogicalDevice->overlayPersistentState->effectEnabledStates,
                     pLogicalDevice->overlayPersistentState->selectedEffects);
             }
         }
@@ -1014,23 +1177,38 @@ namespace vkBasalt
             VkSemaphore finalSemaphore = pLogicalSwapchain->semaphores[index];
 
             // Update overlay state and render if visible (overlay is at device level)
-            if (pLogicalDevice->imguiOverlay)
+            if (pLogicalDevice->imguiOverlay && pLogicalDevice->imguiOverlay->isVisible())
             {
                 OverlayState overlayState;
-                // Use actual active effects from overlay, not just config effects
+                // Use active effects for display, but collect params for ALL selected effects
                 overlayState.effectNames = pLogicalDevice->imguiOverlay->getActiveEffects();
                 if (overlayState.effectNames.empty())
+                {
                     overlayState.effectNames = pConfig->getOption<std::vector<std::string>>("effects", {"cas"});
+                    overlayState.disabledEffects = pConfig->getOption<std::vector<std::string>>("disabledEffects", {});
+                }
                 getAvailableEffects(pConfig.get(), overlayState.currentConfigEffects,
                                     overlayState.defaultConfigEffects, overlayState.effectPaths);
                 overlayState.configPath = pConfig->getConfigFilePath();
-                // Extract just the filename from the path
                 overlayState.configName = std::filesystem::path(overlayState.configPath).filename().string();
                 overlayState.effectsEnabled = presentEffect;
 
-                // Collect parameters from all effects
-                overlayState.parameters = collectEffectParameters(
-                    pConfig, overlayState.effectNames, pLogicalSwapchain->effects);
+                // Ensure all selected effects are in the registry (for dynamically added effects)
+                const auto& allSelectedEffects = pLogicalDevice->imguiOverlay->getSelectedEffects();
+                for (const auto& effectName : allSelectedEffects)
+                {
+                    if (!effectRegistry.hasEffect(effectName))
+                    {
+                        // Find path from effectPaths map
+                        auto pathIt = overlayState.effectPaths.find(effectName);
+                        std::string effectPath = (pathIt != overlayState.effectPaths.end()) ? pathIt->second : "";
+                        effectRegistry.ensureEffect(effectName, effectPath);
+                    }
+                }
+
+                // Get parameters from registry (single source of truth)
+                // Registry has all parameters for all effects (including disabled)
+                overlayState.parameters = effectRegistry.getAllParameters();
 
                 pLogicalDevice->imguiOverlay->updateState(overlayState);
             }
@@ -1338,10 +1516,7 @@ extern "C"
 
     VK_BASALT_EXPORT PFN_vkVoidFunction VKAPI_CALL vkBasalt_GetDeviceProcAddr(VkDevice device, const char* pName)
     {
-        if (vkBasalt::pConfig == nullptr)
-        {
-            vkBasalt::pConfig = std::shared_ptr<vkBasalt::Config>(new vkBasalt::Config());
-        }
+        vkBasalt::initConfigs();
 
         INTERCEPT_CALLS
 
@@ -1353,10 +1528,7 @@ extern "C"
 
     VK_BASALT_EXPORT PFN_vkVoidFunction VKAPI_CALL vkBasalt_GetInstanceProcAddr(VkInstance instance, const char* pName)
     {
-        if (vkBasalt::pConfig == nullptr)
-        {
-            vkBasalt::pConfig = std::shared_ptr<vkBasalt::Config>(new vkBasalt::Config());
-        }
+        vkBasalt::initConfigs();
 
         INTERCEPT_CALLS
 

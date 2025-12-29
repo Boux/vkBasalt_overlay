@@ -1034,7 +1034,8 @@ namespace vkBasalt
             if (spec.type.is_floating_point())
             {
                 p.type = ParamType::Float;
-                p.valueFloat = hasConfig ? pConfig->getOption<float>(spec.name) : spec.initializer_value.as_float[0];
+                p.defaultFloat = spec.initializer_value.as_float[0];
+                p.valueFloat = hasConfig ? pConfig->getOption<float>(spec.name) : p.defaultFloat;
 
                 auto minIt = std::find_if(spec.annotations.begin(), spec.annotations.end(),
                     [](const auto& a) { return a.name == "ui_min"; });
@@ -1051,12 +1052,14 @@ namespace vkBasalt
                 if (spec.type.is_boolean())
                 {
                     p.type = ParamType::Bool;
-                    p.valueBool = hasConfig ? pConfig->getOption<bool>(spec.name) : (spec.initializer_value.as_uint[0] != 0);
+                    p.defaultBool = (spec.initializer_value.as_uint[0] != 0);
+                    p.valueBool = hasConfig ? pConfig->getOption<bool>(spec.name) : p.defaultBool;
                 }
                 else
                 {
                     p.type = ParamType::Int;
-                    p.valueInt = hasConfig ? pConfig->getOption<int32_t>(spec.name) : spec.initializer_value.as_int[0];
+                    p.defaultInt = spec.initializer_value.as_int[0];
+                    p.valueInt = hasConfig ? pConfig->getOption<int32_t>(spec.name) : p.defaultInt;
 
                     auto minIt = std::find_if(spec.annotations.begin(), spec.annotations.end(),
                         [](const auto& a) { return a.name == "ui_min"; });

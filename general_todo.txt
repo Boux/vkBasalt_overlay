@@ -1,0 +1,6 @@
+- tooltips
+- block mouse and keyboard inputs when overlay is active
+- revert value to default
+- manually edit value
+
+-- disabled effect values disappera from config (disabled effect params are not loaded until effect is enabled)

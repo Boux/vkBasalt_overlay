@@ -1,11 +1,15 @@
 #include "imgui_overlay.hpp"
+#include "effect_registry.hpp"
 #include "logger.hpp"
 #include "mouse_input.hpp"
+#include "keyboard_input.hpp"
+#include "config_serializer.hpp"
 
 #include <algorithm>
 #include <cmath>
 
 #include "imgui/imgui.h"
+#include "imgui/imgui_internal.h"
 #include "imgui/backends/imgui_impl_vulkan.h"
 
 namespace vkBasalt
@@ -104,6 +108,11 @@ namespace vkBasalt
     {
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
+        ImGui::GetIO().IniFilename = nullptr;
+
+        std::string iniPath = ConfigSerializer::getBaseConfigDir() + "/imgui.ini";
+        ImGui::LoadIniSettingsFromDisk(iniPath.c_str());
+
         ImGui::StyleColorsDark();
 
         // Make it semi-transparent
@@ -117,7 +126,7 @@ namespace vkBasalt
         if (pPersistentState && pPersistentState->initialized)
         {
             selectedEffects = pPersistentState->selectedEffects;
-            effectEnabledStates = pPersistentState->effectEnabledStates;
+            // Note: effectEnabledStates now live in EffectRegistry (single source of truth)
             editableParams = pPersistentState->editableParams;
             autoApply = pPersistentState->autoApply;
             visible = pPersistentState->visible;
@@ -133,6 +142,9 @@ namespace vkBasalt
         if (!initialized) return;
 
         pLogicalDevice->vkd.QueueWaitIdle(pLogicalDevice->queue);
+
+        std::string iniPath = ConfigSerializer::getBaseConfigDir() + "/imgui.ini";
+        ImGui::SaveIniSettingsToDisk(iniPath.c_str());
 
         if (backendInitialized)
             ImGui_ImplVulkan_Shutdown();
@@ -154,7 +166,7 @@ namespace vkBasalt
             return;
 
         pPersistentState->selectedEffects = selectedEffects;
-        pPersistentState->effectEnabledStates = effectEnabledStates;
+        // Note: effectEnabledStates now live in EffectRegistry (single source of truth)
         pPersistentState->editableParams = editableParams;
         pPersistentState->autoApply = autoApply;
         pPersistentState->visible = visible;
@@ -170,39 +182,59 @@ namespace vkBasalt
         {
             for (const auto& effectName : state.effectNames)
                 selectedEffects.push_back(effectName);
-        }
 
-        // Initialize enabled state for selected effects (default to enabled)
-        for (const auto& effectName : selectedEffects)
-        {
-            if (effectEnabledStates.find(effectName) == effectEnabledStates.end())
-                effectEnabledStates[effectName] = true;
-        }
-
-        // Sync editable params with new state
-        // If params changed (different effect list), reset editableParams
-        if (editableParams.size() != state.parameters.size())
-        {
-            editableParams = state.parameters;
-            return;
-        }
-
-        // Check if params match, update values from state if not modified by user
-        for (size_t i = 0; i < state.parameters.size(); i++)
-        {
-            if (editableParams[i].name != state.parameters[i].name ||
-                editableParams[i].effectName != state.parameters[i].effectName)
+            // Set enabled states from config's disabledEffects (via registry)
+            if (pEffectRegistry)
             {
-                // Params don't match, reset
-                editableParams = state.parameters;
-                return;
+                for (const auto& effectName : selectedEffects)
+                {
+                    bool isDisabled = std::find(state.disabledEffects.begin(), state.disabledEffects.end(), effectName)
+                                      != state.disabledEffects.end();
+                    pEffectRegistry->setEffectEnabled(effectName, !isDisabled);
+                }
             }
-            // Keep editable values, but update min/max from state
-            editableParams[i].minFloat = state.parameters[i].minFloat;
-            editableParams[i].maxFloat = state.parameters[i].maxFloat;
-            editableParams[i].minInt = state.parameters[i].minInt;
-            editableParams[i].maxInt = state.parameters[i].maxInt;
         }
+
+        // Initialize enabled state for new effects (default to enabled, via registry)
+        if (pEffectRegistry)
+        {
+            for (const auto& effectName : selectedEffects)
+            {
+                if (!pEffectRegistry->hasEffect(effectName))
+                    pEffectRegistry->ensureEffect(effectName);
+            }
+        }
+
+        // Merge new parameters with existing ones
+        // Keep existing params for effects that are still selected but not in new params
+        // (happens when ReShade effects are disabled - they're not loaded so no params returned)
+        for (const auto& newParam : state.parameters)
+        {
+            // Find existing param with same effect and name
+            bool found = false;
+            for (auto& existingParam : editableParams)
+            {
+                if (existingParam.effectName != newParam.effectName || existingParam.name != newParam.name)
+                    continue;
+                // Update min/max but keep user-edited value
+                existingParam.minFloat = newParam.minFloat;
+                existingParam.maxFloat = newParam.maxFloat;
+                existingParam.minInt = newParam.minInt;
+                existingParam.maxInt = newParam.maxInt;
+                found = true;
+                break;
+            }
+            if (!found)
+                editableParams.push_back(newParam);
+        }
+
+        // Remove params for effects that are no longer selected
+        editableParams.erase(
+            std::remove_if(editableParams.begin(), editableParams.end(),
+                [this](const EffectParameter& p) {
+                    return std::find(selectedEffects.begin(), selectedEffects.end(), p.effectName) == selectedEffects.end();
+                }),
+            editableParams.end());
     }
 
     std::vector<EffectParameter> ImGuiOverlay::getModifiedParams()
@@ -213,16 +245,80 @@ namespace vkBasalt
     std::vector<std::string> ImGuiOverlay::getActiveEffects() const
     {
         std::vector<std::string> activeEffects;
-
-        // Return enabled effects from selectedEffects
         for (const auto& effectName : selectedEffects)
         {
-            auto it = effectEnabledStates.find(effectName);
-            if (it != effectEnabledStates.end() && it->second)
+            // Use registry as single source of truth for enabled state
+            bool enabled = pEffectRegistry ? pEffectRegistry->isEffectEnabled(effectName) : true;
+            if (enabled)
                 activeEffects.push_back(effectName);
         }
-
         return activeEffects;
+    }
+
+    void ImGuiOverlay::saveCurrentConfig()
+    {
+        // Collect parameters that differ from defaults
+        std::vector<EffectParam> params;
+        for (const auto& p : editableParams)
+        {
+            bool differs = false;
+            if (p.type == ParamType::Float)
+                differs = (p.valueFloat != p.defaultFloat);
+            else if (p.type == ParamType::Int)
+                differs = (p.valueInt != p.defaultInt);
+            else
+                differs = (p.valueBool != p.defaultBool);
+
+            if (!differs)
+                continue;
+
+            EffectParam ep;
+            ep.effectName = p.effectName;
+            ep.paramName = p.name;
+            if (p.type == ParamType::Float)
+                ep.value = std::to_string(p.valueFloat);
+            else if (p.type == ParamType::Int)
+                ep.value = std::to_string(p.valueInt);
+            else
+                ep.value = p.valueBool ? "true" : "false";
+            params.push_back(ep);
+        }
+
+        // Collect disabled effects (from registry)
+        std::vector<std::string> disabledEffects;
+        for (const auto& effect : selectedEffects)
+        {
+            bool enabled = pEffectRegistry ? pEffectRegistry->isEffectEnabled(effect) : true;
+            if (!enabled)
+                disabledEffects.push_back(effect);
+        }
+
+        ConfigSerializer::saveConfig(saveConfigName, selectedEffects, disabledEffects, params);
+    }
+
+    void ImGuiOverlay::setSelectedEffects(const std::vector<std::string>& effects,
+                                          const std::vector<std::string>& disabledEffects)
+    {
+        selectedEffects = effects;
+
+        // Build set of disabled effects for quick lookup
+        std::set<std::string> disabledSet(disabledEffects.begin(), disabledEffects.end());
+
+        // Set enabled states in registry: disabled if in disabledEffects, enabled otherwise
+        if (pEffectRegistry)
+        {
+            for (const auto& effectName : selectedEffects)
+            {
+                bool enabled = (disabledSet.find(effectName) == disabledSet.end());
+                pEffectRegistry->setEffectEnabled(effectName, enabled);
+            }
+        }
+
+        // Clear editable params so they get reloaded from the new config
+        // (otherwise updateState() would preserve old values)
+        editableParams.clear();
+
+        saveToPersistentState();
     }
 
     void ImGuiOverlay::initVulkanBackend(VkFormat swapchainFormat, uint32_t imageCount)
@@ -365,6 +461,19 @@ namespace vkBasalt
         io.MouseWheel = mouse.scrollDelta;
         io.MouseDrawCursor = true;  // Draw software cursor (games often hide the OS cursor)
 
+        // Keyboard input for text fields
+        // Keys are one-shot events, so we send press and release in same frame
+        KeyboardState keyboard = getKeyboardState();
+        for (char c : keyboard.typedChars)
+            io.AddInputCharacter(c);
+        if (keyboard.backspace) { io.AddKeyEvent(ImGuiKey_Backspace, true); io.AddKeyEvent(ImGuiKey_Backspace, false); }
+        if (keyboard.del) { io.AddKeyEvent(ImGuiKey_Delete, true); io.AddKeyEvent(ImGuiKey_Delete, false); }
+        if (keyboard.enter) { io.AddKeyEvent(ImGuiKey_Enter, true); io.AddKeyEvent(ImGuiKey_Enter, false); }
+        if (keyboard.left) { io.AddKeyEvent(ImGuiKey_LeftArrow, true); io.AddKeyEvent(ImGuiKey_LeftArrow, false); }
+        if (keyboard.right) { io.AddKeyEvent(ImGuiKey_RightArrow, true); io.AddKeyEvent(ImGuiKey_RightArrow, false); }
+        if (keyboard.home) { io.AddKeyEvent(ImGuiKey_Home, true); io.AddKeyEvent(ImGuiKey_Home, false); }
+        if (keyboard.end) { io.AddKeyEvent(ImGuiKey_End, true); io.AddKeyEvent(ImGuiKey_End, false); }
+
         // ImGui frame
         ImGui_ImplVulkan_NewFrame();
         ImGui::NewFrame();
@@ -452,11 +561,17 @@ namespace vkBasalt
             {
                 // Apply selection
                 selectedEffects = tempSelectedEffects;
-                // Initialize enabled states for new effects
-                for (const auto& effectName : selectedEffects)
+                // Initialize enabled states for new effects in registry (default to enabled)
+                if (pEffectRegistry)
                 {
-                    if (effectEnabledStates.find(effectName) == effectEnabledStates.end())
-                        effectEnabledStates[effectName] = true;
+                    for (const auto& effectName : selectedEffects)
+                    {
+                        if (!pEffectRegistry->hasEffect(effectName))
+                        {
+                            pEffectRegistry->ensureEffect(effectName);
+                            pEffectRegistry->setEffectEnabled(effectName, true);
+                        }
+                    }
                 }
                 inSelectionMode = false;
                 applyRequested = true;  // Trigger reload with new effects
@@ -468,12 +583,101 @@ namespace vkBasalt
                 inSelectionMode = false;
             }
         }
+        else if (inConfigManageMode)
+        {
+            // Config management mode
+            ImGui::Text("Manage Configs");
+            ImGui::Separator();
+
+            // Refresh config list and get current default
+            configList = ConfigSerializer::listConfigs();
+            std::string currentDefault = ConfigSerializer::getDefaultConfig();
+
+            ImGui::BeginChild("ConfigList", ImVec2(0, -ImGui::GetFrameHeightWithSpacing()), false);
+            for (size_t i = 0; i < configList.size(); i++)
+            {
+                ImGui::PushID(static_cast<int>(i));
+                const std::string& cfg = configList[i];
+
+                // Selectable config name - click to load (limited width so buttons are clickable)
+                float buttonAreaWidth = 130;
+                float nameWidth = ImGui::GetWindowWidth() - buttonAreaWidth;
+                if (ImGui::Selectable(cfg.c_str(), false, 0, ImVec2(nameWidth, 0)))
+                {
+                    // Signal to basalt.cpp to load this config
+                    pendingConfigPath = ConfigSerializer::getConfigsDir() + "/" + cfg + ".conf";
+                    strncpy(saveConfigName, cfg.c_str(), sizeof(saveConfigName) - 1);
+                    applyRequested = true;
+                    inConfigManageMode = false;
+                }
+                ImGui::SameLine();
+
+                bool isDefault = (cfg == currentDefault);
+                if (isDefault)
+                    ImGui::BeginDisabled();
+                if (ImGui::SmallButton("Set Default"))
+                {
+                    ConfigSerializer::setDefaultConfig(cfg);
+                }
+                if (isDefault)
+                    ImGui::EndDisabled();
+                ImGui::SameLine();
+                if (ImGui::SmallButton("Delete"))
+                {
+                    ConfigSerializer::deleteConfig(cfg);
+                }
+                ImGui::PopID();
+            }
+            if (configList.empty())
+            {
+                ImGui::Text("No saved configs");
+            }
+            ImGui::EndChild();
+
+            if (ImGui::Button("Back"))
+            {
+                inConfigManageMode = false;
+            }
+        }
         else
         {
             // Normal mode - show config and effect controls
-            ImGui::Text("Config: %s", state.configPath.c_str());
+
+            // Config section with title
+            ImGui::Text("Config:");
+            ImGui::SameLine();
+
+            // Initialize config name once - only pre-fill for user configs from configs folder
+            static bool nameInitialized = false;
+            bool isUserConfig = state.configPath.find("/configs/") != std::string::npos;
+            if (!nameInitialized && isUserConfig && !state.configName.empty())
+            {
+                std::string name = state.configName;
+                if (name.ends_with(".conf"))
+                    name = name.substr(0, name.size() - 5);
+                strncpy(saveConfigName, name.c_str(), sizeof(saveConfigName) - 1);
+            }
+            nameInitialized = true;
+
+            ImGui::SetNextItemWidth(120);
+            ImGui::InputText("##configname", saveConfigName, sizeof(saveConfigName));
+
+            ImGui::SameLine();
+            ImGui::BeginDisabled(saveConfigName[0] == '\0');
+            if (ImGui::Button("Save"))
+                saveCurrentConfig();
+            ImGui::EndDisabled();
+
+            ImGui::SameLine();
+            if (ImGui::Button("..."))
+                inConfigManageMode = true;
             ImGui::Separator();
-            ImGui::Text("Effects %s (Home to toggle)", state.effectsEnabled ? "ON" : "OFF");
+
+            bool effectsOn = state.effectsEnabled;
+            if (ImGui::Checkbox(effectsOn ? "Effects ON" : "Effects OFF", &effectsOn))
+                toggleEffectsRequested = true;
+            ImGui::SameLine();
+            ImGui::TextDisabled("(Home)");
             ImGui::Separator();
 
             // Select Effects button
@@ -528,10 +732,12 @@ namespace vkBasalt
                     ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
                 ImGui::SameLine();
 
-                // Checkbox to enable/disable effect
-                bool& effectEnabled = effectEnabledStates[effectName];
+                // Checkbox to enable/disable effect (read/write via registry)
+                bool effectEnabled = pEffectRegistry ? pEffectRegistry->isEffectEnabled(effectName) : true;
                 if (ImGui::Checkbox("##enabled", &effectEnabled))
                 {
+                    if (pEffectRegistry)
+                        pEffectRegistry->setEffectEnabled(effectName, effectEnabled);
                     changedThisFrame = true;
                     paramsDirty = true;
                     lastChangeTime = std::chrono::steady_clock::now();
@@ -562,6 +768,14 @@ namespace vkBasalt
                                     param.valueFloat = std::round(param.valueFloat / param.step) * param.step;
                                 changed = true;
                             }
+                            if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0))
+                            {
+                                param.valueFloat = param.defaultFloat;
+                                changed = true;
+                                ImGui::ClearActiveID();
+                            }
+                            if (!param.tooltip.empty() && ImGui::IsItemHovered())
+                                ImGui::SetTooltip("%s", param.tooltip.c_str());
                             break;
                         case ParamType::Int:
                             // Check for combo box (ui_type="combo" or has items)
@@ -589,10 +803,20 @@ namespace vkBasalt
                                     changed = true;
                                 }
                             }
+                            if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0))
+                            {
+                                param.valueInt = param.defaultInt;
+                                changed = true;
+                                ImGui::ClearActiveID();
+                            }
+                            if (!param.tooltip.empty() && ImGui::IsItemHovered())
+                                ImGui::SetTooltip("%s", param.tooltip.c_str());
                             break;
                         case ParamType::Bool:
                             if (ImGui::Checkbox(param.label.c_str(), &param.valueBool))
                                 changed = true;
+                            if (!param.tooltip.empty() && ImGui::IsItemHovered())
+                                ImGui::SetTooltip("%s", param.tooltip.c_str());
                             break;
                         }
                         if (changed)
@@ -642,31 +866,24 @@ namespace vkBasalt
             if (autoApply != prevAutoApply)
                 saveToPersistentState();
             ImGui::SameLine(ImGui::GetWindowWidth() - 60);
-            if (autoApply)
-            {
-                ImGui::BeginDisabled();
-                ImGui::Button("Apply");
-                ImGui::EndDisabled();
 
-                // Auto-apply with debounce (200ms after last change)
-                // Only apply if no changes happened this frame to ensure latest value
-                if (paramsDirty && !changedThisFrame)
-                {
-                    auto now = std::chrono::steady_clock::now();
-                    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastChangeTime).count();
-                    if (elapsed >= 200)
-                    {
-                        applyRequested = true;
-                        paramsDirty = false;
-                        saveToPersistentState();
-                    }
-                }
-            }
-            else
+            // Apply button is always clickable
+            if (ImGui::Button("Apply"))
             {
-                if (ImGui::Button("Apply"))
+                applyRequested = true;
+                paramsDirty = false;
+                saveToPersistentState();
+            }
+
+            // Auto-apply with debounce (200ms after last change)
+            if (autoApply && paramsDirty && !changedThisFrame)
+            {
+                auto now = std::chrono::steady_clock::now();
+                auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastChangeTime).count();
+                if (elapsed >= 200)
                 {
                     applyRequested = true;
+                    paramsDirty = false;
                     saveToPersistentState();
                 }
             }
