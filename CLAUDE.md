@@ -133,6 +133,29 @@ X11-based keyboard/mouse input (`keyboard_input_x11.cpp`, `mouse_input.cpp`) com
 - **Format handling**: Always consider SRGB vs UNORM variants (`format.cpp`)
 - **Logging**: Use `Logger::debug()`, `Logger::info()`, `Logger::err()`
 
+## Code Style
+
+- **Avoid nested ifs**: Keep code flat with single-level indentation where possible. Use early returns, early continues, and guard clauses instead of nesting conditions.
+  ```cpp
+  // Bad - deeply nested
+  if (condition1) {
+      if (condition2) {
+          if (condition3) {
+              doSomething();
+          }
+      }
+  }
+
+  // Good - flat with early returns
+  if (!condition1)
+      return;
+  if (!condition2)
+      return;
+  if (!condition3)
+      return;
+  doSomething();
+  ```
+
 ## Environment Variables
 
 - `ENABLE_VKBASALT=1` - Enable the layer
