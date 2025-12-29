@@ -45,6 +45,7 @@
 #include "effect_transfer.hpp"
 #include "imgui_overlay.hpp"
 #include "effect_params.hpp"
+#include "effect_registry.hpp"
 
 #define VKBASALT_NAME "VK_LAYER_VKBASALT_post_processing"
 
@@ -58,6 +59,7 @@ namespace vkBasalt
 {
     std::shared_ptr<Config> pBaseConfig = nullptr;  // Always vkBasalt.conf
     std::shared_ptr<Config> pConfig = nullptr;      // Current config (base + overlay)
+    EffectRegistry effectRegistry;                   // Single source of truth for effect configs
 
     Logger Logger::s_instance;
 
@@ -156,6 +158,9 @@ namespace vkBasalt
         {
             pConfig = pBaseConfig;  // No current config, use base
         }
+
+        // Initialize effect registry with current config
+        effectRegistry.initialize(pConfig.get());
     }
 
     // Switch to a new config (called from overlay)
@@ -163,6 +168,7 @@ namespace vkBasalt
     {
         pConfig = std::make_shared<Config>(configPath);
         pConfig->setFallback(pBaseConfig.get());
+        effectRegistry.initialize(pConfig.get());  // Re-initialize registry with new config
         cachedParams.dirty = true;
         Logger::info("switched to config: " + configPath);
     }
@@ -1173,19 +1179,22 @@ namespace vkBasalt
                 overlayState.configName = std::filesystem::path(overlayState.configPath).filename().string();
                 overlayState.effectsEnabled = presentEffect;
 
-                // Collect parameters for ALL selected effects (including disabled)
+                // Ensure all selected effects are in the registry (for dynamically added effects)
                 const auto& allSelectedEffects = pLogicalDevice->imguiOverlay->getSelectedEffects();
-                bool effectsChanged = cachedParams.effectNames != allSelectedEffects;
-                bool configChanged = cachedParams.configPath != overlayState.configPath;
-                if (cachedParams.dirty || effectsChanged || configChanged)
+                for (const auto& effectName : allSelectedEffects)
                 {
-                    cachedParams.parameters = collectEffectParameters(
-                        pConfig, allSelectedEffects, pLogicalSwapchain->effects);
-                    cachedParams.effectNames = allSelectedEffects;
-                    cachedParams.configPath = overlayState.configPath;
-                    cachedParams.dirty = false;
+                    if (!effectRegistry.hasEffect(effectName))
+                    {
+                        // Find path from effectPaths map
+                        auto pathIt = overlayState.effectPaths.find(effectName);
+                        std::string effectPath = (pathIt != overlayState.effectPaths.end()) ? pathIt->second : "";
+                        effectRegistry.ensureEffect(effectName, effectPath);
+                    }
                 }
-                overlayState.parameters = cachedParams.parameters;
+
+                // Get parameters from registry (single source of truth)
+                // Registry has all parameters for all effects (including disabled)
+                overlayState.parameters = effectRegistry.getAllParameters();
 
                 pLogicalDevice->imguiOverlay->updateState(overlayState);
             }
