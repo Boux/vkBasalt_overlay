@@ -227,6 +227,7 @@ namespace vkBasalt
 
     void ImGuiOverlay::saveCurrentConfig()
     {
+        // Collect parameters
         std::vector<EffectParam> params;
         for (const auto& p : editableParams)
         {
@@ -241,18 +242,32 @@ namespace vkBasalt
                 ep.value = p.valueBool ? "true" : "false";
             params.push_back(ep);
         }
-        ConfigSerializer::saveConfig(saveConfigName, selectedEffects, params);
+
+        // Collect disabled effects
+        std::vector<std::string> disabledEffects;
+        for (const auto& effect : selectedEffects)
+        {
+            auto it = effectEnabledStates.find(effect);
+            if (it != effectEnabledStates.end() && !it->second)
+                disabledEffects.push_back(effect);
+        }
+
+        ConfigSerializer::saveConfig(saveConfigName, selectedEffects, disabledEffects, params);
     }
 
-    void ImGuiOverlay::setSelectedEffects(const std::vector<std::string>& effects)
+    void ImGuiOverlay::setSelectedEffects(const std::vector<std::string>& effects,
+                                          const std::vector<std::string>& disabledEffects)
     {
         selectedEffects = effects;
-        // Initialize enabled states for new effects
+
+        // Build set of disabled effects for quick lookup
+        std::set<std::string> disabledSet(disabledEffects.begin(), disabledEffects.end());
+
+        // Set enabled states: disabled if in disabledEffects, enabled otherwise
+        effectEnabledStates.clear();
         for (const auto& effectName : selectedEffects)
-        {
-            if (effectEnabledStates.find(effectName) == effectEnabledStates.end())
-                effectEnabledStates[effectName] = true;
-        }
+            effectEnabledStates[effectName] = (disabledSet.find(effectName) == disabledSet.end());
+
         saveToPersistentState();
     }
 

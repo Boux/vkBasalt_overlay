@@ -91,7 +91,9 @@ namespace vkBasalt
         std::vector<std::string> getActiveEffects() const;
 
         // Set effects list (when loading a different config)
-        void setSelectedEffects(const std::vector<std::string>& effects);
+        // disabledEffects: effects that should be unchecked (in list but not rendered)
+        void setSelectedEffects(const std::vector<std::string>& effects,
+                                const std::vector<std::string>& disabledEffects = {});
 
         VkCommandBuffer recordFrame(uint32_t imageIndex, VkImageView imageView, uint32_t width, uint32_t height);
 

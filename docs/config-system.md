@@ -197,7 +197,12 @@ casSharpness = 0.800000
 ClarityRadius = 3
 
 effects = cas:Clarity:deband
+disabledEffects = deband
 ```
+
+- `effects`: All effects in the list (enabled + disabled), preserves order
+- `disabledEffects`: Effects that are unchecked (in list but not rendered)
+- Parameters are saved for all effects, including disabled ones
 
 ### Default Config File
 

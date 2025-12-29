@@ -41,9 +41,22 @@ namespace vkBasalt
         return configs;
     }
 
+    static std::string joinEffects(const std::vector<std::string>& effects)
+    {
+        std::string result;
+        for (size_t i = 0; i < effects.size(); i++)
+        {
+            if (i > 0)
+                result += ":";
+            result += effects[i];
+        }
+        return result;
+    }
+
     bool ConfigSerializer::saveConfig(
         const std::string& configName,
         const std::vector<std::string>& effects,
+        const std::vector<std::string>& disabledEffects,
         const std::vector<EffectParam>& params)
     {
         std::string configsDir = getConfigsDir();
@@ -53,7 +66,6 @@ namespace vkBasalt
             return false;
         }
 
-        // Ensure configs directory exists
         mkdir(configsDir.c_str(), 0755);
 
         std::string filePath = configsDir + "/" + configName + ".conf";
@@ -69,7 +81,7 @@ namespace vkBasalt
         for (const auto& param : params)
             paramsByEffect[param.effectName].push_back(&param);
 
-        // Write params grouped by effect with comments
+        // Write params grouped by effect
         for (const auto& [effectName, effectParams] : paramsByEffect)
         {
             file << "# " << effectName << "\n";
@@ -78,15 +90,12 @@ namespace vkBasalt
             file << "\n";
         }
 
-        // Write effects list
-        std::string effectsList;
-        for (size_t i = 0; i < effects.size(); i++)
-        {
-            if (i > 0)
-                effectsList += ":";
-            effectsList += effects[i];
-        }
-        file << "effects = " << effectsList << "\n";
+        // Write effects list (all effects, enabled + disabled)
+        file << "effects = " << joinEffects(effects) << "\n";
+
+        // Write disabled effects if any
+        if (!disabledEffects.empty())
+            file << "disabledEffects = " << joinEffects(disabledEffects) << "\n";
 
         file.close();
         Logger::info("Saved config to: " + filePath);

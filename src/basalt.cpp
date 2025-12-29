@@ -1054,9 +1054,10 @@ namespace vkBasalt
             {
                 std::string newConfigPath = pLogicalDevice->imguiOverlay->getPendingConfigPath();
                 switchConfig(newConfigPath);
-                // Update overlay with effects from the new config
+                // Update overlay with effects and disabled effects from the new config
                 std::vector<std::string> newEffects = pConfig->getOption<std::vector<std::string>>("effects", {});
-                pLogicalDevice->imguiOverlay->setSelectedEffects(newEffects);
+                std::vector<std::string> disabledEffects = pConfig->getOption<std::vector<std::string>>("disabledEffects", {});
+                pLogicalDevice->imguiOverlay->setSelectedEffects(newEffects, disabledEffects);
                 pLogicalDevice->imguiOverlay->clearPendingConfig();
             }
             else
