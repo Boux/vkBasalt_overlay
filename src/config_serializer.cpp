@@ -14,11 +14,11 @@ namespace vkBasalt
     {
         const char* xdgConfig = std::getenv("XDG_CONFIG_HOME");
         if (xdgConfig)
-            return std::string(xdgConfig) + "/vkBasalt";
+            return std::string(xdgConfig) + "/vkBasalt-overlay";
 
         const char* home = std::getenv("HOME");
         if (home)
-            return std::string(home) + "/.config/vkBasalt";
+            return std::string(home) + "/.config/vkBasalt-overlay";
 
         return "";
     }
@@ -150,7 +150,7 @@ namespace vkBasalt
     {
         const char* home = std::getenv("HOME");
         if (home)
-            return std::string(home) + "/.config/vkBasalt/default_config";
+            return std::string(home) + "/.config/vkBasalt-overlay/default_config";
         return "";
     }
 
@@ -287,6 +287,38 @@ namespace vkBasalt
         file.close();
         Logger::info("Saved settings to: " + configPath);
         return true;
+    }
+
+    void ConfigSerializer::ensureConfigExists()
+    {
+        std::string baseDir = getBaseConfigDir();
+        if (baseDir.empty())
+            return;
+
+        // Create directory if needed
+        mkdir(baseDir.c_str(), 0755);
+
+        // Create reshade directories
+        std::string reshadeDir = baseDir + "/reshade";
+        std::string texturesDir = reshadeDir + "/Textures";
+        std::string shadersDir = reshadeDir + "/Shaders";
+        mkdir(reshadeDir.c_str(), 0755);
+        mkdir(texturesDir.c_str(), 0755);
+        mkdir(shadersDir.c_str(), 0755);
+
+        std::string configPath = baseDir + "/vkBasalt.conf";
+
+        // Check if file exists
+        struct stat st;
+        if (stat(configPath.c_str(), &st) == 0)
+            return;  // File exists
+
+        // Create with defaults
+        VkBasaltSettings defaults;
+        defaults.reshadeTexturePath = texturesDir;
+        defaults.reshadeIncludePath = shadersDir;
+        saveSettings(defaults);
+        Logger::info("Created default vkBasalt.conf");
     }
 
 } // namespace vkBasalt

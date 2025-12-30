@@ -743,15 +743,15 @@ namespace vkBasalt
             ImGui::Text("Paths");
             ImGui::Separator();
 
-            ImGui::Text("ReShade Textures:");
+            ImGui::Text("ReShade Textures (requires restart):");
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("Directory containing ReShade texture files (.png, .jpg, etc.)");
+                ImGui::SetTooltip("Directory containing ReShade texture files (.png, .jpg, etc.)\nChanges require restarting the application.");
             ImGui::SetNextItemWidth(-1);
             ImGui::InputText("##texturePath", settingsTexturePath, sizeof(settingsTexturePath));
 
-            ImGui::Text("ReShade Shaders:");
+            ImGui::Text("ReShade Shaders (requires restart):");
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("Directory containing ReShade shader files (.fx, .fxh)");
+                ImGui::SetTooltip("Directory containing ReShade shader files (.fx, .fxh)\nChanges require restarting the application.");
             ImGui::SetNextItemWidth(-1);
             ImGui::InputText("##includePath", settingsIncludePath, sizeof(settingsIncludePath));
 
@@ -821,9 +821,9 @@ namespace vkBasalt
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("If enabled, effects are active when the game starts.\nIf disabled, effects start off and must be toggled on.");
 
-            ImGui::Checkbox("Depth Capture", &settingsDepthCapture);
+            ImGui::Checkbox("Depth Capture (requires restart)", &settingsDepthCapture);
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("Enable depth buffer capture for effects that use depth.\nMay impact performance. Most effects don't need this.");
+                ImGui::SetTooltip("Enable depth buffer capture for effects that use depth.\nMay impact performance. Most effects don't need this.\nChanges require restarting the application.");
 
             ImGui::EndChild();
 
@@ -841,6 +841,7 @@ namespace vkBasalt
                 newSettings.enableOnLaunch = settingsEnableOnLaunch;
                 newSettings.depthCapture = settingsDepthCapture;
                 ConfigSerializer::saveSettings(newSettings);
+                settingsSaved = true;  // Signal basalt.cpp to reload keybindings
                 inSettingsMode = false;
             }
             ImGui::SameLine();
@@ -885,31 +886,30 @@ namespace vkBasalt
                 inConfigManageMode = true;
             ImGui::SameLine();
             if (ImGui::Button("Settings"))
-            {
-                // Load current settings when entering settings mode
-                if (!settingsInitialized)
-                {
-                    VkBasaltSettings currentSettings = ConfigSerializer::loadSettings();
-                    strncpy(settingsTexturePath, currentSettings.reshadeTexturePath.c_str(), sizeof(settingsTexturePath) - 1);
-                    strncpy(settingsIncludePath, currentSettings.reshadeIncludePath.c_str(), sizeof(settingsIncludePath) - 1);
-                    settingsMaxEffects = currentSettings.maxEffects;
-                    settingsBlockInput = currentSettings.overlayBlockInput;
-                    strncpy(settingsToggleKey, currentSettings.toggleKey.c_str(), sizeof(settingsToggleKey) - 1);
-                    strncpy(settingsReloadKey, currentSettings.reloadKey.c_str(), sizeof(settingsReloadKey) - 1);
-                    strncpy(settingsOverlayKey, currentSettings.overlayKey.c_str(), sizeof(settingsOverlayKey) - 1);
-                    settingsEnableOnLaunch = currentSettings.enableOnLaunch;
-                    settingsDepthCapture = currentSettings.depthCapture;
-                    settingsInitialized = true;
-                }
                 inSettingsMode = true;
-            }
             ImGui::Separator();
+
+            // Initialize settings if not done yet (needed for key display)
+            if (!settingsInitialized)
+            {
+                VkBasaltSettings currentSettings = ConfigSerializer::loadSettings();
+                strncpy(settingsTexturePath, currentSettings.reshadeTexturePath.c_str(), sizeof(settingsTexturePath) - 1);
+                strncpy(settingsIncludePath, currentSettings.reshadeIncludePath.c_str(), sizeof(settingsIncludePath) - 1);
+                settingsMaxEffects = currentSettings.maxEffects;
+                settingsBlockInput = currentSettings.overlayBlockInput;
+                strncpy(settingsToggleKey, currentSettings.toggleKey.c_str(), sizeof(settingsToggleKey) - 1);
+                strncpy(settingsReloadKey, currentSettings.reloadKey.c_str(), sizeof(settingsReloadKey) - 1);
+                strncpy(settingsOverlayKey, currentSettings.overlayKey.c_str(), sizeof(settingsOverlayKey) - 1);
+                settingsEnableOnLaunch = currentSettings.enableOnLaunch;
+                settingsDepthCapture = currentSettings.depthCapture;
+                settingsInitialized = true;
+            }
 
             bool effectsOn = state.effectsEnabled;
             if (ImGui::Checkbox(effectsOn ? "Effects ON" : "Effects OFF", &effectsOn))
                 toggleEffectsRequested = true;
             ImGui::SameLine();
-            ImGui::TextDisabled("(Home)");
+            ImGui::TextDisabled("(%s)", settingsToggleKey);
             ImGui::Separator();
 
             // Add Effects button

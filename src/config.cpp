@@ -9,21 +9,21 @@ namespace vkBasalt
 {
     Config::Config()
     {
-        // Find vkBasalt.conf in standard locations
+        // Find vkBasalt.conf in standard locations (vkBasalt-overlay fork)
         const char* tmpHomeEnv     = std::getenv("XDG_DATA_HOME");
-        std::string userConfigFile = tmpHomeEnv ? std::string(tmpHomeEnv) + "/vkBasalt/vkBasalt.conf"
-                                                : std::string(std::getenv("HOME")) + "/.local/share/vkBasalt/vkBasalt.conf";
+        std::string userConfigFile = tmpHomeEnv ? std::string(tmpHomeEnv) + "/vkBasalt-overlay/vkBasalt.conf"
+                                                : std::string(std::getenv("HOME")) + "/.local/share/vkBasalt-overlay/vkBasalt.conf";
 
         const char* tmpConfigEnv      = std::getenv("XDG_CONFIG_HOME");
-        std::string userXdgConfigFile = tmpConfigEnv ? std::string(tmpConfigEnv) + "/vkBasalt/vkBasalt.conf"
-                                                     : std::string(std::getenv("HOME")) + "/.config/vkBasalt/vkBasalt.conf";
+        std::string userXdgConfigFile = tmpConfigEnv ? std::string(tmpConfigEnv) + "/vkBasalt-overlay/vkBasalt.conf"
+                                                     : std::string(std::getenv("HOME")) + "/.config/vkBasalt-overlay/vkBasalt.conf";
 
         const std::array<std::string, 5> configPaths = {
             userXdgConfigFile,
             userConfigFile,
-            std::string(SYSCONFDIR) + "/vkBasalt.conf",
-            std::string(SYSCONFDIR) + "/vkBasalt/vkBasalt.conf",
-            std::string(DATADIR) + "/vkBasalt/vkBasalt.conf",
+            std::string(SYSCONFDIR) + "/vkBasalt-overlay.conf",
+            std::string(SYSCONFDIR) + "/vkBasalt-overlay/vkBasalt.conf",
+            std::string(DATADIR) + "/vkBasalt-overlay/vkBasalt.conf",
         };
 
         for (const auto& path : configPaths)

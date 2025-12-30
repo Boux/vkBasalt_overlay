@@ -31,7 +31,7 @@ namespace vkBasalt
     class ConfigSerializer
     {
     public:
-        // Save a game-specific config to ~/.config/vkBasalt/configs/<name>.conf
+        // Save a game-specific config to ~/.config/vkBasalt-overlay/configs/<name>.conf
         // effects: all effects in the list (enabled + disabled)
         // disabledEffects: effects that are unchecked (won't be rendered)
         // params: all effect parameters
@@ -43,10 +43,10 @@ namespace vkBasalt
             const std::vector<EffectParam>& params,
             const std::map<std::string, std::string>& effectPaths = {});
 
-        // Get the base config directory path (~/.config/vkBasalt/)
+        // Get the base config directory path (~/.config/vkBasalt-overlay/)
         static std::string getBaseConfigDir();
 
-        // Get the configs directory path (~/.config/vkBasalt/configs/)
+        // Get the configs directory path (~/.config/vkBasalt-overlay/configs/)
         static std::string getConfigsDir();
 
         // List available config files
@@ -63,6 +63,9 @@ namespace vkBasalt
         // Global settings management (vkBasalt.conf)
         static VkBasaltSettings loadSettings();
         static bool saveSettings(const VkBasaltSettings& settings);
+
+        // Ensure vkBasalt.conf exists with defaults (call early at startup)
+        static void ensureConfigExists();
     };
 
 } // namespace vkBasalt

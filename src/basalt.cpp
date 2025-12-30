@@ -120,6 +120,9 @@ namespace vkBasalt
         if (pBaseConfig != nullptr)
             return;  // Already initialized
 
+        // Ensure vkBasalt.conf exists with defaults before reading
+        ConfigSerializer::ensureConfigExists();
+
         // Load base config (vkBasalt.conf) - used for paths, effect definitions
         pBaseConfig = std::make_shared<Config>();
 
@@ -1017,6 +1020,7 @@ namespace vkBasalt
     {
         scoped_lock l(globalLock);
 
+        // Keybindings - can be reloaded when settings are saved
         static uint32_t keySymbol = convertToKeySym(pConfig->getOption<std::string>("toggleKey", "Home"));
         static uint32_t reloadKeySymbol = convertToKeySym(pConfig->getOption<std::string>("reloadKey", "F10"));
         static uint32_t overlayKeySymbol = convertToKeySym(pConfig->getOption<std::string>("overlayKey", "End"));
@@ -1026,6 +1030,18 @@ namespace vkBasalt
         static bool presentEffect = pConfig->getOption<bool>("enableOnLaunch", true);
         static bool reloadPressed = false;
         static bool overlayPressed = false;
+
+        // Check if settings were saved (reload keybindings)
+        LogicalDevice* pDeviceForSettings = deviceMap[GetKey(queue)].get();
+        if (pDeviceForSettings && pDeviceForSettings->imguiOverlay && pDeviceForSettings->imguiOverlay->hasSettingsSaved())
+        {
+            VkBasaltSettings newSettings = ConfigSerializer::loadSettings();
+            keySymbol = convertToKeySym(newSettings.toggleKey);
+            reloadKeySymbol = convertToKeySym(newSettings.reloadKey);
+            overlayKeySymbol = convertToKeySym(newSettings.overlayKey);
+            pDeviceForSettings->imguiOverlay->clearSettingsSaved();
+            Logger::info("Keybindings reloaded from settings");
+        }
 
         if (!initLogged)
         {
