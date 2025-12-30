@@ -3,6 +3,7 @@
 #include "logger.hpp"
 #include "mouse_input.hpp"
 #include "keyboard_input.hpp"
+#include "input_blocker.hpp"
 #include "config_serializer.hpp"
 
 #include <algorithm>
@@ -158,6 +159,13 @@ namespace vkBasalt
             pLogicalDevice->vkd.DestroyDescriptorPool(pLogicalDevice->device, descriptorPool, nullptr);
 
         Logger::info("ImGui overlay destroyed");
+    }
+
+    void ImGuiOverlay::toggle()
+    {
+        visible = !visible;
+        setInputBlocked(visible);
+        saveToPersistentState();
     }
 
     void ImGuiOverlay::saveToPersistentState()

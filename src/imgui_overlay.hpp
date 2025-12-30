@@ -74,7 +74,7 @@ namespace vkBasalt
         ImGuiOverlay(LogicalDevice* device, VkFormat swapchainFormat, uint32_t imageCount, OverlayPersistentState* persistentState);
         ~ImGuiOverlay();
 
-        void toggle() { visible = !visible; saveToPersistentState(); }
+        void toggle();
         bool isVisible() const { return visible; }
 
         void updateState(const OverlayState& state);

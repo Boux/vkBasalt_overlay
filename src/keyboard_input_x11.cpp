@@ -103,6 +103,39 @@ namespace vkBasalt
         return !!(keys_return[kc2 >> 3] & (1 << (kc2 & 7)));
     }
 
+    // Helper to process a keycode and update state
+    static void processKeycode(KeyCode keycode, unsigned int state)
+    {
+        KeySym keysym = XkbKeycodeToKeysym(kbDisplay, keycode, 0, 0);
+
+        // Handle special keys
+        if (keysym == XK_BackSpace) backspacePressed = true;
+        else if (keysym == XK_Delete) deletePressed = true;
+        else if (keysym == XK_Return || keysym == XK_KP_Enter) enterPressed = true;
+        else if (keysym == XK_Left) leftPressed = true;
+        else if (keysym == XK_Right) rightPressed = true;
+        else if (keysym == XK_Home) homePressed = true;
+        else if (keysym == XK_End) endPressed = true;
+        else
+        {
+            // Check shifted state (from event state or keyboard query)
+            bool shifted = (state & ShiftMask) != 0;
+            if (!shifted)
+            {
+                char keys[32];
+                XQueryKeymap(kbDisplay, keys);
+                shifted = (keys[XKeysymToKeycode(kbDisplay, XK_Shift_L) >> 3] & (1 << (XKeysymToKeycode(kbDisplay, XK_Shift_L) & 7))) ||
+                          (keys[XKeysymToKeycode(kbDisplay, XK_Shift_R) >> 3] & (1 << (XKeysymToKeycode(kbDisplay, XK_Shift_R) & 7)));
+            }
+
+            KeySym actualSym = XkbKeycodeToKeysym(kbDisplay, keycode, 0, shifted ? 1 : 0);
+            if (actualSym >= 0x20 && actualSym <= 0x7E)
+            {
+                typedCharsAccumulator += (char)actualSym;
+            }
+        }
+    }
+
     KeyboardState getKeyboardStateX11()
     {
         KeyboardState state;
@@ -116,37 +149,20 @@ namespace vkBasalt
         {
             XEvent ev;
             XNextEvent(kbDisplay, &ev);
-            if (ev.xcookie.type == GenericEvent && ev.xcookie.extension == xiOpcode &&
+
+            // Handle regular KeyPress events (from grab)
+            if (ev.type == KeyPress)
+            {
+                processKeycode(ev.xkey.keycode, ev.xkey.state);
+            }
+            // Handle XInput2 raw events (normal operation)
+            else if (ev.xcookie.type == GenericEvent && ev.xcookie.extension == xiOpcode &&
                 XGetEventData(kbDisplay, &ev.xcookie))
             {
                 if (ev.xcookie.evtype == XI_RawKeyPress)
                 {
                     XIRawEvent* rawEvent = (XIRawEvent*)ev.xcookie.data;
-                    KeyCode keycode = rawEvent->detail;
-                    KeySym keysym = XkbKeycodeToKeysym(kbDisplay, keycode, 0, 0);
-
-                    // Handle special keys
-                    if (keysym == XK_BackSpace) backspacePressed = true;
-                    else if (keysym == XK_Delete) deletePressed = true;
-                    else if (keysym == XK_Return || keysym == XK_KP_Enter) enterPressed = true;
-                    else if (keysym == XK_Left) leftPressed = true;
-                    else if (keysym == XK_Right) rightPressed = true;
-                    else if (keysym == XK_Home) homePressed = true;
-                    else if (keysym == XK_End) endPressed = true;
-                    else
-                    {
-                        // Check shifted state
-                        char keys[32];
-                        XQueryKeymap(kbDisplay, keys);
-                        bool shifted = (keys[XKeysymToKeycode(kbDisplay, XK_Shift_L) >> 3] & (1 << (XKeysymToKeycode(kbDisplay, XK_Shift_L) & 7))) ||
-                                       (keys[XKeysymToKeycode(kbDisplay, XK_Shift_R) >> 3] & (1 << (XKeysymToKeycode(kbDisplay, XK_Shift_R) & 7)));
-
-                        KeySym actualSym = XkbKeycodeToKeysym(kbDisplay, keycode, 0, shifted ? 1 : 0);
-                        if (actualSym >= 0x20 && actualSym <= 0x7E)
-                        {
-                            typedCharsAccumulator += (char)actualSym;
-                        }
-                    }
+                    processKeycode(rawEvent->detail, 0);
                 }
                 XFreeEventData(kbDisplay, &ev.xcookie);
             }
@@ -172,6 +188,12 @@ namespace vkBasalt
         endPressed = false;
 
         return state;
+    }
+
+    void* getKeyboardDisplay()
+    {
+        initKeyboardX11();
+        return kbDisplay;
     }
 
 } // namespace vkBasalt

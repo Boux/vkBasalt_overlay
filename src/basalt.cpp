@@ -15,6 +15,7 @@
 
 #include "util.hpp"
 #include "keyboard_input.hpp"
+#include "input_blocker.hpp"
 
 #include "logical_device.hpp"
 #include "logical_swapchain.hpp"
@@ -997,6 +998,14 @@ namespace vkBasalt
                 pLogicalDevice->overlayPersistentState.get());
             // Set the effect registry pointer (single source of truth for enabled states)
             pLogicalDevice->imguiOverlay->setEffectRegistry(&effectRegistry);
+
+            // Initialize input blocking (grabs all input when overlay is visible)
+            static bool inputBlockerInited = false;
+            if (!inputBlockerInited)
+            {
+                initInputBlocker(pConfig->getOption<bool>("overlayBlockInput", false));
+                inputBlockerInited = true;
+            }
         }
 
         *pCount = std::min<uint32_t>(*pCount, pLogicalSwapchain->imageCount);
