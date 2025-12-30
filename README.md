@@ -53,6 +53,8 @@ Use ReShade FX shaders from the [reshade-shaders repository](https://github.com/
 
 ## Installation
 
+**Warning!** Make sur you uninstall the original vkBasalt if you want to use this fork, they both use the same env variables and will cause some collisions.
+
 ```bash
 git clone https://github.com/Boux/vkBasalt_overlay.git
 cd vkBasalt_overlay
