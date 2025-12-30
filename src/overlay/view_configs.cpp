@@ -17,15 +17,20 @@ namespace vkBasalt
         configList = ConfigSerializer::listConfigs();
         std::string currentDefault = ConfigSerializer::getDefaultConfig();
 
+        // Calculate button group width once
+        float setDefaultWidth = ImGui::CalcTextSize("Set Default").x + ImGui::GetStyle().FramePadding.x * 2;
+        float deleteWidth = ImGui::CalcTextSize("Delete").x + ImGui::GetStyle().FramePadding.x * 2;
+        float buttonGroupWidth = setDefaultWidth + deleteWidth + ImGui::GetStyle().ItemSpacing.x;
+
         ImGui::BeginChild("ConfigList", ImVec2(0, -ImGui::GetFrameHeightWithSpacing()), false);
+        float buttonGroupX = ImGui::GetContentRegionAvail().x - buttonGroupWidth;
         for (size_t i = 0; i < configList.size(); i++)
         {
             ImGui::PushID(static_cast<int>(i));
             const std::string& cfg = configList[i];
 
-            // Selectable config name - click to load (limited width so buttons are clickable)
-            float buttonAreaWidth = 130;
-            float nameWidth = ImGui::GetWindowWidth() - buttonAreaWidth;
+            // Selectable config name - click to load
+            float nameWidth = buttonGroupX - ImGui::GetStyle().ItemSpacing.x;
             if (ImGui::Selectable(cfg.c_str(), false, 0, ImVec2(nameWidth, 0)))
             {
                 // Signal to basalt.cpp to load this config
@@ -34,7 +39,7 @@ namespace vkBasalt
                 applyRequested = true;
                 inConfigManageMode = false;
             }
-            ImGui::SameLine();
+            ImGui::SameLine(buttonGroupX);
 
             bool isDefault = (cfg == currentDefault);
             if (isDefault)
