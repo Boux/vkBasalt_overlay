@@ -3,6 +3,9 @@
 #include "logger.hpp"
 
 #include <cstdlib>
+#include <filesystem>
+#include <algorithm>
+#include <set>
 
 #include "imgui/imgui.h"
 #include "imgui/imfilebrowser.h"
@@ -15,6 +18,47 @@ namespace vkBasalt
         ImGuiFileBrowserFlags_HideRegularFiles |
         ImGuiFileBrowserFlags_CloseOnEsc |
         ImGuiFileBrowserFlags_CreateNewDir);
+
+    // Case-insensitive string comparison
+    static bool equalsIgnoreCase(const std::string& a, const std::string& b)
+    {
+        if (a.size() != b.size())
+            return false;
+        for (size_t i = 0; i < a.size(); i++)
+        {
+            if (std::tolower(static_cast<unsigned char>(a[i])) !=
+                std::tolower(static_cast<unsigned char>(b[i])))
+                return false;
+        }
+        return true;
+    }
+
+    // Recursively scan directory for Shaders/ and Textures/ subdirectories
+    static void scanDirectory(
+        const std::filesystem::path& dir,
+        std::set<std::string>& shaderPaths,
+        std::set<std::string>& texturePaths)
+    {
+        try
+        {
+            for (const auto& entry : std::filesystem::recursive_directory_iterator(
+                dir, std::filesystem::directory_options::skip_permission_denied))
+            {
+                if (!entry.is_directory())
+                    continue;
+
+                std::string dirName = entry.path().filename().string();
+                if (equalsIgnoreCase(dirName, "Shaders"))
+                    shaderPaths.insert(entry.path().string());
+                else if (equalsIgnoreCase(dirName, "Textures"))
+                    texturePaths.insert(entry.path().string());
+            }
+        }
+        catch (const std::filesystem::filesystem_error& e)
+        {
+            Logger::err("Shader Manager: Error scanning " + dir.string() + ": " + e.what());
+        }
+    }
 
     void ImGuiOverlay::renderShaderManagerView()
     {
@@ -66,8 +110,16 @@ namespace vkBasalt
         ImGui::Spacing();
         if (ImGui::Button("Rescan All"))
         {
-            // TODO: Implement directory scanning in milestone 4
-            Logger::info("Shader Manager: Rescan requested (not yet implemented)");
+            std::set<std::string> shaderSet, textureSet;
+            for (const auto& parentDir : shaderMgrParentDirs)
+            {
+                if (std::filesystem::exists(parentDir) && std::filesystem::is_directory(parentDir))
+                    scanDirectory(parentDir, shaderSet, textureSet);
+            }
+            shaderMgrShaderPaths.assign(shaderSet.begin(), shaderSet.end());
+            shaderMgrTexturePaths.assign(textureSet.begin(), textureSet.end());
+            Logger::info("Shader Manager: Found " + std::to_string(shaderMgrShaderPaths.size()) +
+                " shader paths, " + std::to_string(shaderMgrTexturePaths.size()) + " texture paths");
         }
         ImGui::SameLine();
         ImGui::TextDisabled("(%zu shader paths, %zu texture paths)",
