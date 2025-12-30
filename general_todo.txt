@@ -1,5 +1,4 @@
 - block mouse and keyboard inputs when overlay is active
 - manually edit value
-- multiple instances of same effect
 
 - right click menu

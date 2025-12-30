@@ -37,7 +37,13 @@ namespace vkBasalt
 
         ImGui::Checkbox("Block Input When Overlay Open", &settingsBlockInput);
         if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("When enabled, keyboard and mouse input is captured by the overlay.\nWarning: This blocks ALL input system-wide, even outside the game window!");
+        {
+            ImGui::BeginTooltip();
+            ImGui::Text("When enabled, keyboard and mouse input is captured by the overlay.");
+            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Warning: Experimental feature! May cause some games to freeze.");
+            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Also blocks ALL input system-wide, even outside the game window!");
+            ImGui::EndTooltip();
+        }
 
         ImGui::Text("Max Effects (requires restart):");
         if (ImGui::IsItemHovered())
