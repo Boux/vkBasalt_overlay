@@ -20,6 +20,7 @@
 #include "sampler.hpp"
 #include "image.hpp"
 #include "format.hpp"
+#include "config_serializer.hpp"
 
 #include "util.hpp"
 
@@ -237,7 +238,20 @@ namespace vkBasalt
                         break;
                 }
 
-                std::string          filePath = pConfig->getOption<std::string>("reshadeTexturePath") + "/" + source->value.string_data;
+                // Search for texture in discovered paths from shader manager
+                std::string textureName = source->value.string_data;
+                std::string filePath;
+                FILE* file = nullptr;
+
+                ShaderManagerConfig shaderMgrConfig = ConfigSerializer::loadShaderManagerConfig();
+                for (const auto& texPath : shaderMgrConfig.discoveredTexturePaths)
+                {
+                    filePath = texPath + "/" + textureName;
+                    file = fopen(filePath.c_str(), "rb");
+                    if (file != nullptr)
+                        break;
+                }
+
                 stbi_uc*             pixels;
                 std::vector<stbi_uc> resizedPixels;
                 uint32_t             size;
@@ -246,11 +260,10 @@ namespace vkBasalt
 
                 size = textureExtent.width * textureExtent.height * desiredChannels;
 
-                FILE* const file = fopen(filePath.c_str(), "rb");
-
                 if (file == nullptr)
                 {
-                    Logger::err("couldn't open texture: " + filePath);
+                    Logger::err("couldn't open texture: " + textureName + " (searched " +
+                        std::to_string(shaderMgrConfig.discoveredTexturePaths.size()) + " directories)");
                 }
                 if (stbi_dds_test_file(file))
                 {
@@ -1245,20 +1258,34 @@ namespace vkBasalt
         preprocessor.add_macro_definition("BUFFER_RCP_WIDTH", "(1.0 / BUFFER_WIDTH)");
         preprocessor.add_macro_definition("BUFFER_RCP_HEIGHT", "(1.0 / BUFFER_HEIGHT)");
         preprocessor.add_macro_definition("BUFFER_COLOR_DEPTH", (inputOutputFormatUNORM == VK_FORMAT_A2R10G10B10_UNORM_PACK32) ? "10" : "8");
-        std::string includePath = pConfig->getOption<std::string>("reshadeIncludePath");
-        preprocessor.add_include_path(includePath);
+        // Add all discovered shader paths from shader manager
+        ShaderManagerConfig shaderMgrConfig = ConfigSerializer::loadShaderManagerConfig();
+        for (const auto& path : shaderMgrConfig.discoveredShaderPaths)
+            preprocessor.add_include_path(path);
 
-        // Use provided effectPath, or try to find it from config/includePath
+        // Use provided effectPath, or try to find it in discovered shader paths
         std::string shaderPath = this->effectPath;
         if (shaderPath.empty())
         {
             shaderPath = pConfig->getOption<std::string>(effectName, "");
-            if (shaderPath.empty() && !includePath.empty())
+            if (shaderPath.empty())
             {
-                // Try with .fx extension first, then without
-                shaderPath = includePath + "/" + effectName + ".fx";
-                if (!std::filesystem::exists(shaderPath))
-                    shaderPath = includePath + "/" + effectName;
+                // Search discovered shader paths for the effect
+                for (const auto& searchPath : shaderMgrConfig.discoveredShaderPaths)
+                {
+                    std::string candidate = searchPath + "/" + effectName + ".fx";
+                    if (std::filesystem::exists(candidate))
+                    {
+                        shaderPath = candidate;
+                        break;
+                    }
+                    candidate = searchPath + "/" + effectName;
+                    if (std::filesystem::exists(candidate))
+                    {
+                        shaderPath = candidate;
+                        break;
+                    }
+                }
             }
         }
 

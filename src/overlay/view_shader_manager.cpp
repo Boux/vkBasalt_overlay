@@ -183,6 +183,7 @@ namespace vkBasalt
             config.discoveredShaderPaths = shaderMgrShaderPaths;
             config.discoveredTexturePaths = shaderMgrTexturePaths;
             ConfigSerializer::saveShaderManagerConfig(config);
+            shaderPathsChanged = true;  // Signal basalt.cpp to refresh effect list
         }
     }
 

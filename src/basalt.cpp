@@ -233,14 +233,13 @@ namespace vkBasalt
             }
         }
 
-        // Auto-discover .fx files in reshadeIncludePath
-        std::string includePath = pBaseConfig ? pBaseConfig->getOption<std::string>("reshadeIncludePath", "")
-                                              : pConfig->getOption<std::string>("reshadeIncludePath", "");
-        if (!includePath.empty())
+        // Auto-discover .fx files in all shader manager discovered paths
+        ShaderManagerConfig shaderMgrConfig = ConfigSerializer::loadShaderManagerConfig();
+        for (const auto& shaderPath : shaderMgrConfig.discoveredShaderPaths)
         {
             try
             {
-                for (const auto& entry : std::filesystem::directory_iterator(includePath))
+                for (const auto& entry : std::filesystem::directory_iterator(shaderPath))
                 {
                     if (!entry.is_regular_file())
                         continue;
@@ -252,7 +251,7 @@ namespace vkBasalt
                     // Effect name is filename without .fx extension
                     std::string effectName = filename.substr(0, filename.size() - 3);
 
-                    // Skip if already known (from config definitions)
+                    // Skip if already known (from config definitions or other paths)
                     if (knownEffects.find(effectName) != knownEffects.end())
                         continue;
 
@@ -260,15 +259,15 @@ namespace vkBasalt
                     effectPaths[effectName] = entry.path().string();
                     knownEffects.insert(effectName);
                 }
-
-                // Sort discovered effects alphabetically
-                std::sort(defaultConfigEffects.begin(), defaultConfigEffects.end());
             }
             catch (const std::filesystem::filesystem_error& e)
             {
-                Logger::warn("failed to scan reshadeIncludePath: " + std::string(e.what()));
+                Logger::warn("failed to scan shader path " + shaderPath + ": " + std::string(e.what()));
             }
         }
+
+        // Sort discovered effects alphabetically
+        std::sort(defaultConfigEffects.begin(), defaultConfigEffects.end());
 
         // Update cache
         cachedEffects.currentConfigEffects = currentConfigEffects;
@@ -1042,6 +1041,14 @@ namespace vkBasalt
             initInputBlocker(newSettings.overlayBlockInput);
             pDeviceForSettings->imguiOverlay->clearSettingsSaved();
             Logger::info("Settings reloaded");
+        }
+
+        // Check if shader paths were changed (refresh available effects list)
+        if (pDeviceForSettings && pDeviceForSettings->imguiOverlay && pDeviceForSettings->imguiOverlay->hasShaderPathsChanged())
+        {
+            cachedEffects.initialized = false;  // Force re-scan of available effects
+            pDeviceForSettings->imguiOverlay->clearShaderPathsChanged();
+            Logger::info("Shader paths changed, effect list refreshed");
         }
 
         if (!initLogged)

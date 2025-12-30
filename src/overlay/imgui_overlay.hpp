@@ -104,6 +104,10 @@ namespace vkBasalt
         bool hasSettingsSaved() const { return settingsSaved; }
         void clearSettingsSaved() { settingsSaved = false; }
 
+        // Shader paths were changed (effect list needs refresh)
+        bool hasShaderPathsChanged() const { return shaderPathsChanged; }
+        void clearShaderPathsChanged() { shaderPathsChanged = false; }
+
         // Returns list of effects that should be active (enabled, for reloading)
         std::vector<std::string> getActiveEffects() const;
 
@@ -167,6 +171,7 @@ namespace vkBasalt
         bool settingsInitialized = false;
         int listeningForKey = 0;  // 0=none, 1=toggle, 2=reload, 3=overlay
         bool settingsSaved = false;  // True when settings saved, cleared by basalt.cpp
+        bool shaderPathsChanged = false;  // True when shader manager saved, cleared by basalt.cpp
         size_t maxEffects = 10;
         int dragSourceIndex = -1;   // Index of effect being dragged, -1 if none
         int dragTargetIndex = -1;   // Index where effect will be dropped

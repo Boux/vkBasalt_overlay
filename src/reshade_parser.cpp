@@ -9,6 +9,7 @@
 #include "reshade/effect_preprocessor.hpp"
 
 #include "logger.hpp"
+#include "config_serializer.hpp"
 
 namespace vkBasalt
 {
@@ -67,7 +68,7 @@ namespace vkBasalt
             return items;
         }
 
-        void setupPreprocessor(reshadefx::preprocessor& pp, const std::string& includePath)
+        void setupPreprocessor(reshadefx::preprocessor& pp)
         {
             pp.add_macro_definition("__RESHADE__", std::to_string(INT_MAX));
             pp.add_macro_definition("__RESHADE_PERFORMANCE_MODE__", "1");
@@ -77,7 +78,11 @@ namespace vkBasalt
             pp.add_macro_definition("BUFFER_RCP_WIDTH", "(1.0 / BUFFER_WIDTH)");
             pp.add_macro_definition("BUFFER_RCP_HEIGHT", "(1.0 / BUFFER_HEIGHT)");
             pp.add_macro_definition("BUFFER_COLOR_DEPTH", "8");
-            pp.add_include_path(includePath);
+
+            // Add all discovered shader paths from shader manager
+            ShaderManagerConfig shaderMgrConfig = ConfigSerializer::loadShaderManagerConfig();
+            for (const auto& path : shaderMgrConfig.discoveredShaderPaths)
+                pp.add_include_path(path);
         }
 
         void applyFloatRange(EffectParameter& p, const auto& annotations)
@@ -176,7 +181,7 @@ namespace vkBasalt
 
         // Setup preprocessor
         reshadefx::preprocessor preprocessor;
-        setupPreprocessor(preprocessor, pConfig->getOption<std::string>("reshadeIncludePath"));
+        setupPreprocessor(preprocessor);
 
         if (!preprocessor.append_file(effectPath))
         {
