@@ -123,15 +123,11 @@ namespace vkBasalt
 
         initVulkanBackend(swapchainFormat, imageCount);
 
-        // Restore state from persistent state if available
-        if (pPersistentState && pPersistentState->initialized)
+        // Restore UI preferences from persistent state
+        if (pPersistentState)
         {
-            selectedEffects = pPersistentState->selectedEffects;
-            // Note: effectEnabledStates now live in EffectRegistry (single source of truth)
-            editableParams = pPersistentState->editableParams;
             autoApply = pPersistentState->autoApply;
             visible = pPersistentState->visible;
-            applyRequested = true;  // Rebuild effect chain with restored state
         }
 
         initialized = true;
@@ -173,58 +169,49 @@ namespace vkBasalt
         if (!pPersistentState)
             return;
 
-        pPersistentState->selectedEffects = selectedEffects;
-        // Note: effectEnabledStates now live in EffectRegistry (single source of truth)
-        pPersistentState->editableParams = editableParams;
+        // Only save UI preferences - effect state is in the registry
         pPersistentState->autoApply = autoApply;
         pPersistentState->visible = visible;
-        pPersistentState->initialized = true;
     }
 
     void ImGuiOverlay::updateState(const OverlayState& newState)
     {
         state = newState;
 
-        // Initialize selectedEffects with config effects on first call
-        if (selectedEffects.empty())
-        {
-            for (const auto& effectName : state.effectNames)
-                selectedEffects.push_back(effectName);
+        if (!pEffectRegistry)
+            return;
 
-            // Set enabled states from config's disabledEffects (via registry)
-            if (pEffectRegistry)
+        // Initialize selected effects from config on first call only
+        if (!pEffectRegistry->isInitializedFromConfig() && !state.effectNames.empty())
+        {
+            pEffectRegistry->setSelectedEffects(state.effectNames);
+            pEffectRegistry->setInitializedFromConfig(true);
+
+            // Set enabled states from config's disabledEffects
+            for (const auto& effectName : state.effectNames)
             {
-                for (const auto& effectName : selectedEffects)
-                {
-                    bool isDisabled = std::find(state.disabledEffects.begin(), state.disabledEffects.end(), effectName)
-                                      != state.disabledEffects.end();
-                    pEffectRegistry->setEffectEnabled(effectName, !isDisabled);
-                }
+                bool isDisabled = std::find(state.disabledEffects.begin(), state.disabledEffects.end(), effectName)
+                                  != state.disabledEffects.end();
+                pEffectRegistry->setEffectEnabled(effectName, !isDisabled);
             }
         }
 
-        // Initialize enabled state for new effects (default to enabled, via registry)
-        if (pEffectRegistry)
+        // Initialize enabled state for new effects (default to enabled)
+        const auto& selectedEffects = pEffectRegistry->getSelectedEffects();
+        for (const auto& effectName : selectedEffects)
         {
-            for (const auto& effectName : selectedEffects)
-            {
-                if (!pEffectRegistry->hasEffect(effectName))
-                    pEffectRegistry->ensureEffect(effectName);
-            }
+            if (!pEffectRegistry->hasEffect(effectName))
+                pEffectRegistry->ensureEffect(effectName);
         }
 
         // Merge new parameters with existing ones
-        // Keep existing params for effects that are still selected but not in new params
-        // (happens when ReShade effects are disabled - they're not loaded so no params returned)
         for (const auto& newParam : state.parameters)
         {
-            // Find existing param with same effect and name
             bool found = false;
             for (auto& existingParam : editableParams)
             {
                 if (existingParam.effectName != newParam.effectName || existingParam.name != newParam.name)
                     continue;
-                // Update min/max but keep user-edited value
                 existingParam.minFloat = newParam.minFloat;
                 existingParam.maxFloat = newParam.maxFloat;
                 existingParam.minInt = newParam.minInt;
@@ -239,7 +226,7 @@ namespace vkBasalt
         // Remove params for effects that are no longer selected
         editableParams.erase(
             std::remove_if(editableParams.begin(), editableParams.end(),
-                [this](const EffectParameter& p) {
+                [&selectedEffects](const EffectParameter& p) {
                     return std::find(selectedEffects.begin(), selectedEffects.end(), p.effectName) == selectedEffects.end();
                 }),
             editableParams.end());
@@ -253,14 +240,21 @@ namespace vkBasalt
     std::vector<std::string> ImGuiOverlay::getActiveEffects() const
     {
         std::vector<std::string> activeEffects;
-        for (const auto& effectName : selectedEffects)
+        if (!pEffectRegistry)
+            return activeEffects;
+
+        for (const auto& effectName : pEffectRegistry->getSelectedEffects())
         {
-            // Use registry as single source of truth for enabled state
-            bool enabled = pEffectRegistry ? pEffectRegistry->isEffectEnabled(effectName) : true;
-            if (enabled)
+            if (pEffectRegistry->isEffectEnabled(effectName))
                 activeEffects.push_back(effectName);
         }
         return activeEffects;
+    }
+
+    const std::vector<std::string>& ImGuiOverlay::getSelectedEffects() const
+    {
+        static std::vector<std::string> empty;
+        return pEffectRegistry ? pEffectRegistry->getSelectedEffects() : empty;
     }
 
     void ImGuiOverlay::saveCurrentConfig()
@@ -292,43 +286,39 @@ namespace vkBasalt
             params.push_back(ep);
         }
 
+        if (!pEffectRegistry)
+            return;
+
+        const auto& selectedEffects = pEffectRegistry->getSelectedEffects();
+
         // Collect disabled effects (from registry)
         std::vector<std::string> disabledEffects;
         for (const auto& effect : selectedEffects)
         {
-            bool enabled = pEffectRegistry ? pEffectRegistry->isEffectEnabled(effect) : true;
-            if (!enabled)
+            if (!pEffectRegistry->isEffectEnabled(effect))
                 disabledEffects.push_back(effect);
         }
 
         // Collect effect paths/types for serialization
-        // For ReShade: store file path (e.g., "Clarity.2 = /path/to/Clarity.fx")
-        // For built-in: store effect type (e.g., "cas.2 = cas")
         std::map<std::string, std::string> effectPaths;
         std::vector<PreprocessorDefinition> allDefs;
-        if (pEffectRegistry)
+        for (const auto& effectName : selectedEffects)
         {
-            for (const auto& effectName : selectedEffects)
+            if (pEffectRegistry->isEffectBuiltIn(effectName))
             {
-                if (pEffectRegistry->isEffectBuiltIn(effectName))
-                {
-                    // Built-in effect: store the type name
-                    std::string effectType = pEffectRegistry->getEffectType(effectName);
-                    if (!effectType.empty())
-                        effectPaths[effectName] = effectType;
-                }
-                else
-                {
-                    // ReShade effect: store the file path
-                    std::string path = pEffectRegistry->getEffectFilePath(effectName);
-                    if (!path.empty())
-                        effectPaths[effectName] = path;
+                std::string effectType = pEffectRegistry->getEffectType(effectName);
+                if (!effectType.empty())
+                    effectPaths[effectName] = effectType;
+            }
+            else
+            {
+                std::string path = pEffectRegistry->getEffectFilePath(effectName);
+                if (!path.empty())
+                    effectPaths[effectName] = path;
 
-                    // Collect preprocessor definitions
-                    const auto& defs = pEffectRegistry->getPreprocessorDefs(effectName);
-                    for (const auto& def : defs)
-                        allDefs.push_back(def);
-                }
+                const auto& defs = pEffectRegistry->getPreprocessorDefs(effectName);
+                for (const auto& def : defs)
+                    allDefs.push_back(def);
             }
         }
 
@@ -338,26 +328,23 @@ namespace vkBasalt
     void ImGuiOverlay::setSelectedEffects(const std::vector<std::string>& effects,
                                           const std::vector<std::string>& disabledEffects)
     {
-        selectedEffects = effects;
+        if (!pEffectRegistry)
+            return;
+
+        pEffectRegistry->setSelectedEffects(effects);
 
         // Build set of disabled effects for quick lookup
         std::set<std::string> disabledSet(disabledEffects.begin(), disabledEffects.end());
 
         // Set enabled states in registry: disabled if in disabledEffects, enabled otherwise
-        if (pEffectRegistry)
+        for (const auto& effectName : effects)
         {
-            for (const auto& effectName : selectedEffects)
-            {
-                bool enabled = (disabledSet.find(effectName) == disabledSet.end());
-                pEffectRegistry->setEffectEnabled(effectName, enabled);
-            }
+            bool enabled = (disabledSet.find(effectName) == disabledSet.end());
+            pEffectRegistry->setEffectEnabled(effectName, enabled);
         }
 
         // Clear editable params so they get reloaded from the new config
-        // (otherwise updateState() would preserve old values)
         editableParams.clear();
-
-        saveToPersistentState();
     }
 
     void ImGuiOverlay::initVulkanBackend(VkFormat swapchainFormat, uint32_t imageCount)

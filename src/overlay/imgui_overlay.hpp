@@ -59,14 +59,12 @@ namespace vkBasalt
         std::vector<EffectParameter> parameters;
     };
 
-    // Persistent state that survives swapchain recreation
+    // UI preferences that persist across swapchain recreation
+    // Effect-related state is managed by EffectRegistry
     struct OverlayPersistentState
     {
-        std::vector<std::string> selectedEffects;
-        std::vector<EffectParameter> editableParams;
         bool autoApply = true;
         bool visible = false;
-        bool initialized = false;  // True once user has interacted with overlay
     };
 
     class ImGuiOverlay
@@ -112,7 +110,7 @@ namespace vkBasalt
         std::vector<std::string> getActiveEffects() const;
 
         // Returns all selected effects (enabled + disabled, for parameter collection)
-        const std::vector<std::string>& getSelectedEffects() const { return selectedEffects; }
+        const std::vector<std::string>& getSelectedEffects() const;
 
         // Set effects list (when loading a different config)
         // disabledEffects: effects that should be unchecked (in list but not rendered)
@@ -145,7 +143,6 @@ namespace vkBasalt
         uint32_t imageCount = 0;
         OverlayState state;
         std::vector<EffectParameter> editableParams;  // Persistent editable values
-        std::vector<std::string> selectedEffects;           // Effects user has selected (ordered)
         std::vector<std::pair<std::string, std::string>> pendingAddEffects;  // {instanceName, effectType} to add
         bool inSelectionMode = false;
         int insertPosition = -1;  // Position to insert effects (-1 = append to end)

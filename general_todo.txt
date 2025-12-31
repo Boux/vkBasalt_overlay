@@ -1,3 +1,7 @@
 - rework input blocking logic (it's pretty janky)
 - native wayland support for GUI
 - manually edit param value
+- lut built-in effect crashes the game
+
+- clear all effects button
+- auto-save shader manager

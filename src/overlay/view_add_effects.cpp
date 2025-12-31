@@ -23,6 +23,12 @@ namespace vkBasalt
 
     void ImGuiOverlay::renderAddEffectsView()
     {
+        if (!pEffectRegistry)
+            return;
+
+        // Get a mutable copy of selected effects
+        std::vector<std::string> selectedEffects = pEffectRegistry->getSelectedEffects();
+
         // Handle ESC to clear search
         if (ImGui::IsKeyPressed(ImGuiKey_Escape) && addEffectsSearch[0] != '\0')
         {
@@ -266,16 +272,13 @@ namespace vkBasalt
             {
                 selectedEffects.insert(selectedEffects.begin() + pos, instanceName);
                 pos++;  // Insert subsequent effects after the previous one
-                if (pEffectRegistry)
-                {
-                    pEffectRegistry->ensureEffect(instanceName, effectType);
-                    pEffectRegistry->setEffectEnabled(instanceName, true);
-                }
+                pEffectRegistry->ensureEffect(instanceName, effectType);
+                pEffectRegistry->setEffectEnabled(instanceName, true);
             }
             if (!pendingAddEffects.empty())
             {
+                pEffectRegistry->setSelectedEffects(selectedEffects);
                 applyRequested = true;
-                saveToPersistentState();
             }
             pendingAddEffects.clear();
             insertPosition = -1;

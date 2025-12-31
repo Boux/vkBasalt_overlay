@@ -998,12 +998,11 @@ namespace vkBasalt
             createFakeSwapchainImages(pLogicalDevice, pLogicalSwapchain->swapchainCreateInfo, fakeImageCount, pLogicalSwapchain->fakeImageMemory);
         Logger::debug("created fake swapchain images");
 
-        // If there's persisted state, skip expensive effect creation - use pass-through and debounce
-        bool hasPersisted = pLogicalDevice->overlayPersistentState &&
-                            pLogicalDevice->overlayPersistentState->initialized &&
-                            !pLogicalDevice->overlayPersistentState->selectedEffects.empty();
+        // Check if registry has been initialized (user has loaded effects)
+        bool registryInitialized = effectRegistry.isInitializedFromConfig();
+        bool hasSelectedEffects = !effectRegistry.getSelectedEffects().empty();
 
-        if (hasPersisted)
+        if (registryInitialized && hasSelectedEffects)
         {
             Logger::debug("using pass-through during resize, will restore effects after debounce");
             // Create simple pass-through: first fake images -> swapchain images
@@ -1016,10 +1015,14 @@ namespace vkBasalt
             resizeDebounce.pending = true;
             resizeDebounce.lastResizeTime = std::chrono::steady_clock::now();
         }
+        else if (registryInitialized)
+        {
+            // User cleared all effects - respect that choice, create no effects
+            Logger::debug("user cleared all effects, skipping effect creation");
+        }
         else
         {
-            // Normal effect creation from config using centralized helper
-            // checkEnabledState=false because disabled effects were already filtered out above
+            // First run, no user interaction yet - create effects from config
             createEffectsForSwapchain(pLogicalSwapchain, pLogicalDevice, pConfig.get(), effectStrings, false);
         }
 
@@ -1219,13 +1222,13 @@ namespace vkBasalt
             Logger::info("debounced resize reload after " + std::to_string(resizeElapsed) + "ms");
             resizeDebounce.pending = false;
 
+            // Get selected effects from registry (single source of truth)
+            const auto& selectedEffects = effectRegistry.getSelectedEffects();
             for (auto& [_, pSwapchain] : swapchainMap)
             {
-                if (pSwapchain->fakeImages.empty() || !pLogicalDevice->overlayPersistentState)
+                if (pSwapchain->fakeImages.empty())
                     continue;
-                // Effect enabled states are read from global effectRegistry
-                reloadEffectsForSwapchain(pSwapchain.get(), pConfig.get(),
-                    pLogicalDevice->overlayPersistentState->selectedEffects);
+                reloadEffectsForSwapchain(pSwapchain.get(), pConfig.get(), selectedEffects);
             }
         }
 

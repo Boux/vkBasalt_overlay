@@ -105,6 +105,12 @@ namespace vkBasalt
 
     void ImGuiOverlay::renderMainView(const KeyboardState& keyboard)
     {
+        if (!pEffectRegistry)
+            return;
+
+        // Get a mutable copy of selected effects for this frame
+        std::vector<std::string> selectedEffects = pEffectRegistry->getSelectedEffects();
+
         // Normal mode - show config and effect controls
 
         // Config section with title
@@ -170,8 +176,9 @@ namespace vkBasalt
         if (ImGui::Button("Clear All"))
         {
             selectedEffects.clear();
-            applyRequested = true;
-            saveToPersistentState();
+            pEffectRegistry->clearSelectedEffects();
+            paramsDirty = true;
+            lastChangeTime = std::chrono::steady_clock::now();
         }
         ImGui::EndDisabled();
         ImGui::Separator();
@@ -300,6 +307,7 @@ namespace vkBasalt
                 if (ImGui::MenuItem("Remove"))
                 {
                     selectedEffects.erase(selectedEffects.begin() + i);
+                    pEffectRegistry->setSelectedEffects(selectedEffects);
                     changedThisFrame = true;
                     paramsDirty = true;
                     lastChangeTime = std::chrono::steady_clock::now();
@@ -376,10 +384,10 @@ namespace vkBasalt
                     std::string moving = selectedEffects[dragSourceIndex];
                     selectedEffects.erase(selectedEffects.begin() + dragSourceIndex);
                     selectedEffects.insert(selectedEffects.begin() + dragTargetIndex, moving);
+                    pEffectRegistry->setSelectedEffects(selectedEffects);
                     changedThisFrame = true;
                     paramsDirty = true;
                     lastChangeTime = std::chrono::steady_clock::now();
-                    saveToPersistentState();
                 }
                 isDragging = false;
                 dragSourceIndex = -1;

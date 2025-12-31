@@ -85,8 +85,19 @@ namespace vkBasalt
         // Set a preprocessor definition value
         void setPreprocessorDefValue(const std::string& effectName, const std::string& macroName, const std::string& value);
 
+        // Selected effects management (ordered list for UI)
+        const std::vector<std::string>& getSelectedEffects() const { return selectedEffects; }
+        void setSelectedEffects(const std::vector<std::string>& effects);
+        void clearSelectedEffects();
+
+        // Check if effects have been initialized from config (first load complete)
+        bool isInitializedFromConfig() const { return initializedFromConfig; }
+        void setInitializedFromConfig(bool value) { initializedFromConfig = value; }
+
     private:
         std::vector<EffectConfig> effects;
+        std::vector<std::string> selectedEffects;  // Ordered list of selected effects for UI
+        bool initializedFromConfig = false;        // True once first load from config is complete
         Config* pConfig = nullptr;
         mutable std::mutex mutex;
 

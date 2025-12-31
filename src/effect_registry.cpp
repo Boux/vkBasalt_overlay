@@ -526,4 +526,16 @@ namespace vkBasalt
         }
     }
 
+    void EffectRegistry::setSelectedEffects(const std::vector<std::string>& effects)
+    {
+        std::lock_guard<std::mutex> lock(mutex);
+        selectedEffects = effects;
+    }
+
+    void EffectRegistry::clearSelectedEffects()
+    {
+        std::lock_guard<std::mutex> lock(mutex);
+        selectedEffects.clear();
+    }
+
 } // namespace vkBasalt
