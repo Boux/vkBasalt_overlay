@@ -79,7 +79,17 @@ namespace vkBasalt
             shaderMgrInitialized = true;
         }
 
-        ImGui::BeginChild("ShaderMgrContent", ImVec2(0, -ImGui::GetFrameHeightWithSpacing()), false);
+        // Helper to save config (auto-save on any change)
+        auto saveConfig = [&]() {
+            ShaderManagerConfig config;
+            config.parentDirectories = shaderMgrParentDirs;
+            config.discoveredShaderPaths = shaderMgrShaderPaths;
+            config.discoveredTexturePaths = shaderMgrTexturePaths;
+            ConfigSerializer::saveShaderManagerConfig(config);
+            shaderPathsChanged = true;
+        };
+
+        ImGui::BeginChild("ShaderMgrContent", ImVec2(0, 0), false);
 
         // Parent Directories section
         ImGui::Text("Parent Directories");
@@ -111,7 +121,10 @@ namespace vkBasalt
         ImGui::EndChild();
 
         if (removeIdx >= 0)
+        {
             shaderMgrParentDirs.erase(shaderMgrParentDirs.begin() + removeIdx);
+            saveConfig();
+        }
 
         // Rescan button and stats
         ImGui::Spacing();
@@ -127,6 +140,7 @@ namespace vkBasalt
             shaderMgrTexturePaths.assign(textureSet.begin(), textureSet.end());
             Logger::info("Shader Manager: Found " + std::to_string(shaderMgrShaderPaths.size()) +
                 " shader paths, " + std::to_string(shaderMgrTexturePaths.size()) + " texture paths");
+            saveConfig();
         }
         ImGui::SameLine();
         ImGui::TextDisabled("(%zu shader paths, %zu texture paths)",
@@ -155,7 +169,10 @@ namespace vkBasalt
                     ImGui::PopID();
                 }
                 if (removeShaderIdx >= 0)
+                {
                     shaderMgrShaderPaths.erase(shaderMgrShaderPaths.begin() + removeShaderIdx);
+                    saveConfig();
+                }
             }
             ImGui::TreePop();
         }
@@ -178,7 +195,10 @@ namespace vkBasalt
                     ImGui::PopID();
                 }
                 if (removeTextureIdx >= 0)
+                {
                     shaderMgrTexturePaths.erase(shaderMgrTexturePaths.begin() + removeTextureIdx);
+                    saveConfig();
+                }
             }
             ImGui::TreePop();
         }
@@ -205,20 +225,13 @@ namespace vkBasalt
                 }
             }
             if (!exists)
+            {
                 shaderMgrParentDirs.push_back(selectedPath);
+                saveConfig();
+            }
             dirBrowser.ClearSelected();
         }
 
-        // Footer button
-        if (ImGui::Button("Save"))
-        {
-            ShaderManagerConfig config;
-            config.parentDirectories = shaderMgrParentDirs;
-            config.discoveredShaderPaths = shaderMgrShaderPaths;
-            config.discoveredTexturePaths = shaderMgrTexturePaths;
-            ConfigSerializer::saveShaderManagerConfig(config);
-            shaderPathsChanged = true;  // Signal basalt.cpp to refresh effect list
-        }
     }
 
 } // namespace vkBasalt
