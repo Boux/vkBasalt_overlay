@@ -116,17 +116,17 @@ namespace vkBasalt
 
         std::string iniPath = ConfigSerializer::getBaseConfigDir() + "/imgui.ini";
 
-        // Check if ini file exists and has content before loading
+        // Load ini file and check if it has docking data
         std::ifstream iniFile(iniPath);
-        if (iniFile.good())
-        {
-            iniFile.seekg(0, std::ios::end);
-            if (iniFile.tellg() > 0)
-            {
-                ImGui::LoadIniSettingsFromDisk(iniPath.c_str());
-                dockLayoutInitialized = true;  // Don't override saved layout
-            }
-        }
+        std::string iniContent((std::istreambuf_iterator<char>(iniFile)),
+                                std::istreambuf_iterator<char>());
+
+        if (!iniContent.empty())
+            ImGui::LoadIniSettingsFromDisk(iniPath.c_str());
+
+        // Only skip default layout if ini has actual docking data
+        if (iniContent.find("[Docking]") != std::string::npos)
+            dockLayoutInitialized = true;
 
         ImGui::StyleColorsDark();
 
