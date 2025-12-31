@@ -554,7 +554,7 @@ namespace vkBasalt
             effectRegistry.ensureEffect(effectName, effectPath);
         }
 
-        overlayState.parameters = effectRegistry.getAllParameters();
+        // Parameters now read directly from EffectRegistry, no need to pass via state
         pLogicalDevice->imguiOverlay->updateState(std::move(overlayState));
     }
 

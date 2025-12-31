@@ -48,6 +48,9 @@ namespace vkBasalt
         EffectParam* getParameter(const std::string& effectName, const std::string& paramName);
         const EffectParam* getParameter(const std::string& effectName, const std::string& paramName) const;
 
+        // Get all parameters for a specific effect (returns pointers, not clones)
+        std::vector<EffectParam*> getParametersForEffect(const std::string& effectName);
+
         // Get config reference for effects to read values
         Config* getConfig() const { return pConfig; }
 

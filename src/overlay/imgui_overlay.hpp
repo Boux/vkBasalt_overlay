@@ -28,7 +28,7 @@ namespace vkBasalt
         std::string configPath;
         std::string configName;  // Just the filename (e.g., "tunic.conf")
         bool effectsEnabled = true;
-        std::vector<std::unique_ptr<EffectParam>> parameters;
+        // Parameters now read directly from EffectRegistry
     };
 
     // UI preferences that persist across swapchain recreation
@@ -116,7 +116,6 @@ namespace vkBasalt
         VkFormat swapchainFormat = VK_FORMAT_UNDEFINED;
         uint32_t imageCount = 0;
         OverlayState state;
-        std::vector<std::unique_ptr<EffectParam>> editableParams;  // Persistent editable values
         std::vector<std::pair<std::string, std::string>> pendingAddEffects;  // {instanceName, effectType} to add
         bool inSelectionMode = false;
         int insertPosition = -1;  // Position to insert effects (-1 = append to end)

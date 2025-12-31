@@ -378,6 +378,21 @@ namespace vkBasalt
         return findParam(*effect, paramName);
     }
 
+    std::vector<EffectParam*> EffectRegistry::getParametersForEffect(const std::string& effectName)
+    {
+        std::lock_guard<std::mutex> lock(mutex);
+        std::vector<EffectParam*> result;
+
+        EffectConfig* effect = findEffect(effectName);
+        if (!effect)
+            return result;
+
+        for (auto& param : effect->parameters)
+            result.push_back(param.get());
+
+        return result;
+    }
+
     bool EffectRegistry::hasEffect(const std::string& name) const
     {
         std::lock_guard<std::mutex> lock(mutex);

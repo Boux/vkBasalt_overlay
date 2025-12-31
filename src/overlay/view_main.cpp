@@ -213,10 +213,8 @@ namespace vkBasalt
                 // Reset to defaults
                 if (ImGui::MenuItem("Reset to Defaults"))
                 {
-                    for (auto& param : editableParams)
+                    for (auto* param : pEffectRegistry->getParametersForEffect(effectName))
                     {
-                        if (param->effectName != effectName)
-                            continue;
                         FieldEditor* editor = FieldEditorFactory::instance().getEditor(param->getType());
                         if (editor)
                             editor->resetToDefault(*param);
@@ -303,14 +301,11 @@ namespace vkBasalt
             }
 
             // Show parameters for this effect
-            int paramIndex = 0;
-            for (auto& param : editableParams)
+            auto effectParams = pEffectRegistry->getParametersForEffect(effectName);
+            for (size_t paramIdx = 0; paramIdx < effectParams.size(); paramIdx++)
             {
-                if (param->effectName != effectName)
-                    continue;
-
-                ImGui::PushID(paramIndex++);
-                if (renderFieldEditor(*param))
+                ImGui::PushID(static_cast<int>(paramIdx));
+                if (renderFieldEditor(*effectParams[paramIdx]))
                 {
                     paramsDirty = true;
                     changedThisFrame = true;

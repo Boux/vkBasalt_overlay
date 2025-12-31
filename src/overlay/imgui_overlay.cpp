@@ -203,49 +203,14 @@ namespace vkBasalt
             if (!pEffectRegistry->hasEffect(effectName))
                 pEffectRegistry->ensureEffect(effectName);
         }
-
-        // Merge new parameters with existing ones
-        for (const auto& newParam : state.parameters)
-        {
-            bool found = false;
-            for (auto& existingParam : editableParams)
-            {
-                if (existingParam->effectName != newParam->effectName || existingParam->name != newParam->name)
-                    continue;
-                // Update range values based on type
-                if (existingParam->getType() == ParamType::Float && newParam->getType() == ParamType::Float)
-                {
-                    auto& existFloat = static_cast<FloatParam&>(*existingParam);
-                    auto& newFloat = static_cast<const FloatParam&>(*newParam);
-                    existFloat.minValue = newFloat.minValue;
-                    existFloat.maxValue = newFloat.maxValue;
-                }
-                else if (existingParam->getType() == ParamType::Int && newParam->getType() == ParamType::Int)
-                {
-                    auto& existInt = static_cast<IntParam&>(*existingParam);
-                    auto& newInt = static_cast<const IntParam&>(*newParam);
-                    existInt.minValue = newInt.minValue;
-                    existInt.maxValue = newInt.maxValue;
-                }
-                found = true;
-                break;
-            }
-            if (!found)
-                editableParams.push_back(newParam->clone());
-        }
-
-        // Remove params for effects that are no longer selected
-        editableParams.erase(
-            std::remove_if(editableParams.begin(), editableParams.end(),
-                [&selectedEffects](const std::unique_ptr<EffectParam>& p) {
-                    return std::find(selectedEffects.begin(), selectedEffects.end(), p->effectName) == selectedEffects.end();
-                }),
-            editableParams.end());
+        // No editableParams merging needed - Registry IS the source of truth
     }
 
     std::vector<std::unique_ptr<EffectParam>> ImGuiOverlay::getModifiedParams()
     {
-        return cloneParams(editableParams);
+        if (!pEffectRegistry)
+            return {};
+        return pEffectRegistry->getAllParameters();
     }
 
     std::vector<std::string> ImGuiOverlay::getActiveEffects() const
@@ -270,29 +235,32 @@ namespace vkBasalt
 
     void ImGuiOverlay::saveCurrentConfig()
     {
-        // Collect parameters that differ from defaults using polymorphic interface
-        std::vector<ConfigParam> params;
-        for (const auto& p : editableParams)
-        {
-            if (!p->hasChanged())
-                continue;
-
-            // Use polymorphic serialize method
-            auto serialized = p->serialize();
-            if (!serialized.empty())
-            {
-                ConfigParam cp;
-                cp.effectName = p->effectName;
-                cp.paramName = p->name;
-                cp.value = serialized[0].second;
-                params.push_back(cp);
-            }
-        }
-
         if (!pEffectRegistry)
             return;
 
         const auto& selectedEffects = pEffectRegistry->getSelectedEffects();
+
+        // Collect parameters that differ from defaults using polymorphic interface
+        std::vector<ConfigParam> params;
+        for (const auto& effectName : selectedEffects)
+        {
+            for (auto* p : pEffectRegistry->getParametersForEffect(effectName))
+            {
+                if (!p->hasChanged())
+                    continue;
+
+                // Use polymorphic serialize method
+                auto serialized = p->serialize();
+                if (!serialized.empty())
+                {
+                    ConfigParam cp;
+                    cp.effectName = p->effectName;
+                    cp.paramName = p->name;
+                    cp.value = serialized[0].second;
+                    params.push_back(cp);
+                }
+            }
+        }
 
         // Collect disabled effects (from registry)
         std::vector<std::string> disabledEffects;
@@ -345,9 +313,6 @@ namespace vkBasalt
             bool enabled = (disabledSet.find(effectName) == disabledSet.end());
             pEffectRegistry->setEffectEnabled(effectName, enabled);
         }
-
-        // Clear editable params so they get reloaded from the new config
-        editableParams.clear();
     }
 
     void ImGuiOverlay::initVulkanBackend(VkFormat swapchainFormat, uint32_t imageCount)
