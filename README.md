@@ -24,6 +24,10 @@ Feature showcase: https://www.youtube.com/watch?v=_KJTToAynr0
 - **Diagnostics** - FPS, frame time graphs, GPU usage, and memory stats (AMD)
 - **Up to 200 Effects** - Large effect chains with VRAM usage estimates
 
+## Bugs
+
+- Default config is sometimes not loaded properly and requires Apply to be clicked manually at least once (will fix soon).
+
 ### Built-in Effects
 - **CAS** - Contrast Adaptive Sharpening
 - **DLS** - Denoised Luma Sharpening
