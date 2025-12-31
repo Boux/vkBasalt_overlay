@@ -120,27 +120,6 @@ ReShade shader and texture paths are managed through the Shader Manager tab in t
 
 Save named configurations through the overlay GUI. They are stored in `~/.config/vkBasalt-overlay/configs/`. You can set any saved config as the default.
 
-## ReShade Shaders Setup
-
-1. Download shaders from [reshade-shaders](https://github.com/crosire/reshade-shaders)
-2. Copy `Shaders` folder to `~/.config/vkBasalt-overlay/reshade/Shaders`
-3. Copy `Textures` folder to `~/.config/vkBasalt-overlay/reshade/Textures`
-4. Open the overlay and add effects from the "ReShade" sections
-
-## Debug Output
-
-Set log level with environment variable:
-```bash
-VKBASALT_LOG_LEVEL=debug ENABLE_VKBASALT=1 %command%
-```
-
-Levels: `trace`, `debug`, `info`, `warn`, `error`, `none`
-
-Output to file:
-```bash
-VKBASALT_LOG_FILE="vkBasalt.log"
-```
-
 ## Known Limitations
 
 - X11 only for keyboard input (Wayland not fully supported)
