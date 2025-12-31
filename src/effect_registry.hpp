@@ -92,7 +92,9 @@ namespace vkBasalt
 
         // Check if effects have been initialized from config (first load complete)
         bool isInitializedFromConfig() const { return initializedFromConfig; }
-        void setInitializedFromConfig(bool value) { initializedFromConfig = value; }
+
+        // Initialize selected effects from config (call once at startup)
+        void initializeSelectedEffectsFromConfig();
 
     private:
         std::vector<EffectConfig> effects;

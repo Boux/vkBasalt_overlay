@@ -538,4 +538,34 @@ namespace vkBasalt
         selectedEffects.clear();
     }
 
+    void EffectRegistry::initializeSelectedEffectsFromConfig()
+    {
+        if (initializedFromConfig || !pConfig)
+            return;
+
+        // Read effects list from config
+        std::vector<std::string> configEffects = pConfig->getOption<std::vector<std::string>>("effects", {});
+        std::vector<std::string> disabledEffects = pConfig->getOption<std::vector<std::string>>("disabledEffects", {});
+
+        // Build set of disabled effects for quick lookup
+        std::set<std::string> disabledSet(disabledEffects.begin(), disabledEffects.end());
+
+        // Set selected effects
+        {
+            std::lock_guard<std::mutex> lock(mutex);
+            selectedEffects = configEffects;
+        }
+
+        // Set enabled states (disabled if in disabledEffects list)
+        for (const auto& effectName : configEffects)
+        {
+            bool enabled = (disabledSet.find(effectName) == disabledSet.end());
+            setEffectEnabled(effectName, enabled);
+        }
+
+        initializedFromConfig = true;
+        Logger::debug("EffectRegistry: initialized " + std::to_string(configEffects.size()) +
+                      " effects from config (" + std::to_string(disabledEffects.size()) + " disabled)");
+    }
+
 } // namespace vkBasalt

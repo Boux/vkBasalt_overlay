@@ -517,13 +517,9 @@ namespace vkBasalt
         pLogicalSwapchain->effects.clear();
         pLogicalSwapchain->defaultTransfer.reset();
 
-        // Use provided active effects list
-        // Only fall back to config if registry hasn't been initialized (first load)
-        std::vector<std::string> effectStrings;
-        if (activeEffects.empty() && !effectRegistry.isInitializedFromConfig())
-            effectStrings = pConfig->getOption<std::vector<std::string>>("effects", {});
-        else
-            effectStrings = activeEffects;
+        // Use provided active effects list directly - no fallback to config
+        // Registry is the single source of truth (initialized at first swapchain creation)
+        std::vector<std::string> effectStrings = activeEffects;
 
         // Check if we have enough fake images for the effects
         // Fake images are allocated at swapchain creation based on maxEffectSlots
@@ -575,13 +571,9 @@ namespace vkBasalt
         OverlayState overlayState;
         overlayState.effectNames = pLogicalDevice->imguiOverlay->getActiveEffects();
 
-        // Only fall back to config effects if registry hasn't been initialized yet
-        // (user clearing all effects should stay empty, not revert to config)
-        if (overlayState.effectNames.empty() && !effectRegistry.isInitializedFromConfig())
-        {
-            overlayState.effectNames = pConfig->getOption<std::vector<std::string>>("effects", {});
-            overlayState.disabledEffects = pConfig->getOption<std::vector<std::string>>("disabledEffects", {});
-        }
+        // No fallback to config - registry is the single source of truth
+        // (initialized from config at first swapchain creation)
+
         getAvailableEffects(pConfig.get(), overlayState.currentConfigEffects,
                             overlayState.defaultConfigEffects, overlayState.effectPaths);
         overlayState.configPath = pConfig->getConfigFilePath();
@@ -980,21 +972,17 @@ namespace vkBasalt
             pLogicalDevice->vkd.CreateImageView(pLogicalDevice->device, &viewInfo, nullptr, &pLogicalSwapchain->imageViews[i]);
         }
 
-        std::vector<std::string> effectStrings = pConfig->getOption<std::vector<std::string>>("effects", {});
-        std::vector<std::string> disabledEffects = pConfig->getOption<std::vector<std::string>>("disabledEffects", {});
+        // Initialize registry from config on first run (before calculating effect slots)
+        bool isFirstRun = !effectRegistry.isInitializedFromConfig();
+        if (isFirstRun)
+            effectRegistry.initializeSelectedEffectsFromConfig();
 
-        // Filter out disabled effects
-        effectStrings.erase(
-            std::remove_if(effectStrings.begin(), effectStrings.end(),
-                [&disabledEffects](const std::string& effect) {
-                    return std::find(disabledEffects.begin(), disabledEffects.end(), effect) != disabledEffects.end();
-                }),
-            effectStrings.end());
+        const auto& selectedEffects = effectRegistry.getSelectedEffects();
 
         // Allow dynamic effect loading by allocating for more effects than configured
         // maxEffects defaults to 10, allowing users to enable additional effects at runtime
         int32_t maxEffects = pConfig->getOption<int32_t>("maxEffects", 10);
-        size_t effectSlots = std::max(effectStrings.size(), (size_t)maxEffects);
+        size_t effectSlots = std::max(selectedEffects.size(), (size_t)maxEffects);
         pLogicalSwapchain->maxEffectSlots = effectSlots;
 
         // create 1 more set of images when we can't use the swapchain it self
@@ -1004,14 +992,10 @@ namespace vkBasalt
             createFakeSwapchainImages(pLogicalDevice, pLogicalSwapchain->swapchainCreateInfo, fakeImageCount, pLogicalSwapchain->fakeImageMemory);
         Logger::debug("created fake swapchain images");
 
-        // Check if registry has been initialized (user has loaded effects)
-        bool registryInitialized = effectRegistry.isInitializedFromConfig();
-        bool hasSelectedEffects = !effectRegistry.getSelectedEffects().empty();
-
-        if (registryInitialized && hasSelectedEffects)
+        if (!isFirstRun && !selectedEffects.empty())
         {
+            // Resize with effects - use pass-through and debounce for smooth resize
             Logger::debug("using pass-through during resize, will restore effects after debounce");
-            // Create simple pass-through: first fake images -> swapchain images
             std::vector<VkImage> firstImages(pLogicalSwapchain->fakeImages.begin(),
                                              pLogicalSwapchain->fakeImages.begin() + pLogicalSwapchain->imageCount);
             pLogicalSwapchain->effects.push_back(std::shared_ptr<Effect>(new TransferEffect(
@@ -1021,20 +1005,15 @@ namespace vkBasalt
             resizeDebounce.pending = true;
             resizeDebounce.lastResizeTime = std::chrono::steady_clock::now();
         }
-        else if (registryInitialized)
-        {
-            // User cleared all effects - respect that choice, create no effects
-            Logger::debug("user cleared all effects, skipping effect creation");
-        }
         else
         {
-            // First run, no user interaction yet - create effects from config
-            createEffectsForSwapchain(pLogicalSwapchain, pLogicalDevice, pConfig.get(), effectStrings, false);
+            // First run OR empty effects - create effects from registry
+            createEffectsForSwapchain(pLogicalSwapchain, pLogicalDevice, pConfig.get(), selectedEffects, false);
         }
 
         DepthState depth = getDepthState(pLogicalDevice);
 
-        Logger::debug("effect string count: " + std::to_string(effectStrings.size()));
+        Logger::debug("selected effect count: " + std::to_string(selectedEffects.size()));
         Logger::debug("effect count: " + std::to_string(pLogicalSwapchain->effects.size()));
 
         pLogicalSwapchain->commandBuffersEffect = allocateCommandBuffer(pLogicalDevice, pLogicalSwapchain->imageCount);

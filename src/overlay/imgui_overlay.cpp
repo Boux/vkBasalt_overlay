@@ -181,22 +181,8 @@ namespace vkBasalt
         if (!pEffectRegistry)
             return;
 
-        // Initialize selected effects from config on first call only
-        if (!pEffectRegistry->isInitializedFromConfig() && !state.effectNames.empty())
-        {
-            pEffectRegistry->setSelectedEffects(state.effectNames);
-            pEffectRegistry->setInitializedFromConfig(true);
-
-            // Set enabled states from config's disabledEffects
-            for (const auto& effectName : state.effectNames)
-            {
-                bool isDisabled = std::find(state.disabledEffects.begin(), state.disabledEffects.end(), effectName)
-                                  != state.disabledEffects.end();
-                pEffectRegistry->setEffectEnabled(effectName, !isDisabled);
-            }
-        }
-
-        // Initialize enabled state for new effects (default to enabled)
+        // Registry is already initialized from config at swapchain creation
+        // Just ensure any newly added effects are in the registry
         const auto& selectedEffects = pEffectRegistry->getSelectedEffects();
         for (const auto& effectName : selectedEffects)
         {
