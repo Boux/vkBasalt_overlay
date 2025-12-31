@@ -86,7 +86,12 @@ namespace vkBasalt
             ImGui::SetTooltip("Maximum number of effects that can be active simultaneously.\nChanges require restarting the application.");
         ImGui::SetNextItemWidth(100);
         if (ImGui::InputInt("##maxEffects", &settingsMaxEffects))
+        {
+            if (settingsMaxEffects < 1) settingsMaxEffects = 1;
+            if (settingsMaxEffects > 50) settingsMaxEffects = 50;
+            maxEffects = static_cast<size_t>(settingsMaxEffects);
             saveSettings();
+        }
         if (settingsMaxEffects < 1) settingsMaxEffects = 1;
         if (settingsMaxEffects > 50) settingsMaxEffects = 50;
 

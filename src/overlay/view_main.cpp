@@ -148,6 +148,7 @@ namespace vkBasalt
         {
             VkBasaltSettings currentSettings = ConfigSerializer::loadSettings();
             settingsMaxEffects = currentSettings.maxEffects;
+            maxEffects = static_cast<size_t>(currentSettings.maxEffects);
             settingsBlockInput = currentSettings.overlayBlockInput;
             strncpy(settingsToggleKey, currentSettings.toggleKey.c_str(), sizeof(settingsToggleKey) - 1);
             strncpy(settingsReloadKey, currentSettings.reloadKey.c_str(), sizeof(settingsReloadKey) - 1);
