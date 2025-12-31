@@ -1,4 +1,4 @@
-- block mouse and keyboard inputs when overlay is active
-- manually edit value
-
-- right click menu
+- rework input blocking logic (it's pretty janky)
+- native wayland support for GUI
+- manually edit param value
+- search in add effect

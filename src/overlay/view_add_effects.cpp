@@ -2,13 +2,59 @@
 #include "effect_registry.hpp"
 
 #include <algorithm>
+#include <cstring>
+#include <cctype>
 
 #include "imgui/imgui.h"
 
 namespace vkBasalt
 {
+    // Case-insensitive substring match
+    static bool matchesSearch(const std::string& text, const char* search)
+    {
+        if (!search || !search[0])
+            return true;
+        std::string lowerText = text;
+        std::string lowerSearch = search;
+        std::transform(lowerText.begin(), lowerText.end(), lowerText.begin(), ::tolower);
+        std::transform(lowerSearch.begin(), lowerSearch.end(), lowerSearch.begin(), ::tolower);
+        return lowerText.find(lowerSearch) != std::string::npos;
+    }
+
     void ImGuiOverlay::renderAddEffectsView()
     {
+        // Handle ESC to clear search
+        if (ImGui::IsKeyPressed(ImGuiKey_Escape) && addEffectsSearch[0] != '\0')
+        {
+            addEffectsSearch[0] = '\0';
+        }
+
+        // Capture keyboard input for seamless search (only when no widget is active)
+        if (!ImGui::IsAnyItemActive())
+        {
+            ImGuiIO& io = ImGui::GetIO();
+            for (int i = 0; i < io.InputQueueCharacters.Size; i++)
+            {
+                ImWchar c = io.InputQueueCharacters[i];
+                if (c >= 32 && c < 127)  // Printable ASCII
+                {
+                    size_t len = strlen(addEffectsSearch);
+                    if (len < sizeof(addEffectsSearch) - 1)
+                    {
+                        addEffectsSearch[len] = static_cast<char>(c);
+                        addEffectsSearch[len + 1] = '\0';
+                    }
+                }
+            }
+            // Handle backspace
+            if (ImGui::IsKeyPressed(ImGuiKey_Backspace) && addEffectsSearch[0] != '\0')
+            {
+                size_t len = strlen(addEffectsSearch);
+                if (len > 0)
+                    addEffectsSearch[len - 1] = '\0';
+            }
+        }
+
         // Add Effects mode - two column layout
         if (insertPosition >= 0)
             ImGui::Text("Insert Effects at position %d (max %zu)", insertPosition, maxEffects);
@@ -73,8 +119,25 @@ namespace vkBasalt
 
         // Left column: Available effects
         ImGui::BeginChild("EffectList", ImVec2(columnWidth, contentHeight), true);
-        ImGui::Text("Available:");
-        ImGui::Separator();
+
+        bool hasSearch = addEffectsSearch[0] != '\0';
+
+        // Show search bar only when searching
+        if (hasSearch)
+        {
+            ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.2f, 0.2f, 0.3f, 1.0f));
+            ImGui::SetNextItemWidth(-1);
+            ImGui::InputText("##search", addEffectsSearch, sizeof(addEffectsSearch), ImGuiInputTextFlags_AutoSelectAll);
+            ImGui::PopStyleColor();
+            ImGui::TextDisabled("ESC to clear");
+            ImGui::Separator();
+        }
+        else
+        {
+            ImGui::Text("Available:");
+            ImGui::TextDisabled("(type to search)");
+            ImGui::Separator();
+        }
 
         // Sort effects for each category
         std::vector<std::string> sortedCurrentConfig = state.currentConfigEffects;
@@ -82,36 +145,82 @@ namespace vkBasalt
         std::sort(sortedCurrentConfig.begin(), sortedCurrentConfig.end());
         std::sort(sortedDefaultConfig.begin(), sortedDefaultConfig.end());
 
-        // Built-in effects
-        ImGui::Text("Built-in:");
+        // Built-in effects (filtered)
+        bool hasBuiltinMatches = false;
         for (const auto& effectType : builtinEffects)
-            renderAddButton(effectType);
-
-        // ReShade effects from current config
-        if (!sortedCurrentConfig.empty())
         {
-            ImGui::Separator();
-            ImGui::Text("ReShade (%s):", state.configName.c_str());
+            if (matchesSearch(effectType, addEffectsSearch))
+            {
+                hasBuiltinMatches = true;
+                break;
+            }
+        }
+        if (hasBuiltinMatches)
+        {
+            if (!hasSearch)
+                ImGui::Text("Built-in:");
+            for (const auto& effectType : builtinEffects)
+            {
+                if (matchesSearch(effectType, addEffectsSearch))
+                    renderAddButton(effectType);
+            }
+        }
+
+        // ReShade effects from current config (filtered)
+        bool hasCurrentMatches = false;
+        for (const auto& effectType : sortedCurrentConfig)
+        {
+            if (matchesSearch(effectType, addEffectsSearch))
+            {
+                hasCurrentMatches = true;
+                break;
+            }
+        }
+        if (hasCurrentMatches)
+        {
+            if (hasBuiltinMatches || !hasSearch)
+                ImGui::Separator();
+            if (!hasSearch)
+                ImGui::Text("ReShade (%s):", state.configName.c_str());
             for (const auto& effectType : sortedCurrentConfig)
             {
+                if (!matchesSearch(effectType, addEffectsSearch))
+                    continue;
                 auto it = state.effectPaths.find(effectType);
                 std::string path = (it != state.effectPaths.end()) ? it->second : "";
                 renderAddButton(effectType, path);
             }
         }
 
-        // ReShade effects from default config
-        if (!sortedDefaultConfig.empty())
+        // ReShade effects from default config (filtered)
+        bool hasDefaultMatches = false;
+        for (const auto& effectType : sortedDefaultConfig)
         {
-            ImGui::Separator();
-            ImGui::Text("ReShade (all):");
+            if (matchesSearch(effectType, addEffectsSearch))
+            {
+                hasDefaultMatches = true;
+                break;
+            }
+        }
+        if (hasDefaultMatches)
+        {
+            if (hasCurrentMatches || hasBuiltinMatches || !hasSearch)
+                ImGui::Separator();
+            if (!hasSearch)
+                ImGui::Text("ReShade (all):");
             for (const auto& effectType : sortedDefaultConfig)
             {
+                if (!matchesSearch(effectType, addEffectsSearch))
+                    continue;
                 auto it = state.effectPaths.find(effectType);
                 std::string path = (it != state.effectPaths.end()) ? it->second : "";
                 renderAddButton(effectType, path);
             }
         }
+
+        // Show "no results" if searching and nothing matches
+        if (hasSearch && !hasBuiltinMatches && !hasCurrentMatches && !hasDefaultMatches)
+            ImGui::TextDisabled("No effects match '%s'", addEffectsSearch);
 
         ImGui::EndChild();
 
@@ -171,6 +280,7 @@ namespace vkBasalt
             pendingAddEffects.clear();
             insertPosition = -1;
             inSelectionMode = false;
+            addEffectsSearch[0] = '\0';
         }
         ImGui::SameLine();
         if (ImGui::Button("Cancel"))
@@ -178,6 +288,7 @@ namespace vkBasalt
             pendingAddEffects.clear();
             insertPosition = -1;
             inSelectionMode = false;
+            addEffectsSearch[0] = '\0';
         }
     }
 

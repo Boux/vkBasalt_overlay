@@ -149,6 +149,7 @@ namespace vkBasalt
         std::vector<std::pair<std::string, std::string>> pendingAddEffects;  // {instanceName, effectType} to add
         bool inSelectionMode = false;
         int insertPosition = -1;  // Position to insert effects (-1 = append to end)
+        char addEffectsSearch[64] = "";  // Search filter for add effects view
         bool inConfigManageMode = false;
         int currentTab = 0;  // 0=Effects, 1=Shaders, 2=Settings
         std::vector<std::string> configList;
