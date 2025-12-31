@@ -192,6 +192,8 @@ namespace vkBasalt
         bool initialized = false;
         bool backendInitialized = false;
         bool dockLayoutInitialized = false;  // True after default dock layout is set up
+        uint32_t currentWidth = 1920;   // Current swapchain resolution for VRAM estimates
+        uint32_t currentHeight = 1080;
         char saveConfigName[64] = "";
         std::string pendingConfigPath;
     };

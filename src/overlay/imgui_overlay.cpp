@@ -454,6 +454,10 @@ namespace vkBasalt
         if (!backendInitialized || !visible)
             return VK_NULL_HANDLE;
 
+        // Store current resolution for VRAM estimates in settings
+        currentWidth = width;
+        currentHeight = height;
+
         VkCommandBuffer cmd = commandBuffers[imageIndex];
 
         // Begin command buffer
