@@ -12,6 +12,7 @@
 
 #include "effect.hpp"
 #include "config.hpp"
+#include "effect_config.hpp"
 #include "reshade_uniforms.hpp"
 
 #include "logical_device.hpp"
@@ -32,7 +33,8 @@ namespace vkBasalt
                       std::vector<VkImage> outputImages,
                       Config*              pConfig,
                       std::string          effectName,
-                      std::string          effectPath = "");  // Optional: explicit path to .fx file
+                      std::string          effectPath = "",  // Optional: explicit path to .fx file
+                      std::vector<PreprocessorDefinition> customDefs = {});  // Custom preprocessor definitions
         void virtual applyEffect(uint32_t imageIndex, VkCommandBuffer commandBuffer) override;
         void virtual updateEffect() override;
         void virtual useDepthImage(VkImageView depthImageView) override;
@@ -80,6 +82,7 @@ namespace vkBasalt
         Config*                               pConfig;
         std::string                           effectName;
         std::string                           effectPath;  // Path to .fx file (may differ from effectName)
+        std::vector<PreprocessorDefinition>   customPreprocessorDefs;  // User-defined macros
         reshadefx::module                     module;
         std::vector<VkDeviceMemory>           textureMemory;
 

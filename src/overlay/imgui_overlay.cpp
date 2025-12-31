@@ -305,6 +305,7 @@ namespace vkBasalt
         // For ReShade: store file path (e.g., "Clarity.2 = /path/to/Clarity.fx")
         // For built-in: store effect type (e.g., "cas.2 = cas")
         std::map<std::string, std::string> effectPaths;
+        std::vector<PreprocessorDefinition> allDefs;
         if (pEffectRegistry)
         {
             for (const auto& effectName : selectedEffects)
@@ -322,11 +323,16 @@ namespace vkBasalt
                     std::string path = pEffectRegistry->getEffectFilePath(effectName);
                     if (!path.empty())
                         effectPaths[effectName] = path;
+
+                    // Collect preprocessor definitions
+                    const auto& defs = pEffectRegistry->getPreprocessorDefs(effectName);
+                    for (const auto& def : defs)
+                        allDefs.push_back(def);
                 }
             }
         }
 
-        ConfigSerializer::saveConfig(saveConfigName, selectedEffects, disabledEffects, params, effectPaths);
+        ConfigSerializer::saveConfig(saveConfigName, selectedEffects, disabledEffects, params, effectPaths, allDefs);
     }
 
     void ImGuiOverlay::setSelectedEffects(const std::vector<std::string>& effects,

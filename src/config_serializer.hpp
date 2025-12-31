@@ -5,6 +5,8 @@
 #include <vector>
 #include <map>
 
+#include "effect_config.hpp"
+
 namespace vkBasalt
 {
     struct EffectParam
@@ -42,12 +44,14 @@ namespace vkBasalt
         // disabledEffects: effects that are unchecked (won't be rendered)
         // params: all effect parameters
         // effectPaths: map of effect name to shader file path (for ReShade effects with custom names)
+        // preprocessorDefs: preprocessor definitions to save (format: effectName#MACRO = value)
         static bool saveConfig(
             const std::string& configName,
             const std::vector<std::string>& effects,
             const std::vector<std::string>& disabledEffects,
             const std::vector<EffectParam>& params,
-            const std::map<std::string, std::string>& effectPaths = {});
+            const std::map<std::string, std::string>& effectPaths = {},
+            const std::vector<PreprocessorDefinition>& preprocessorDefs = {});
 
         // Get the base config directory path (~/.config/vkBasalt-overlay/)
         static std::string getBaseConfigDir();

@@ -3,6 +3,7 @@
 #include <climits>
 #include <algorithm>
 #include <filesystem>
+#include <set>
 
 #include "reshade/effect_parser.hpp"
 #include "reshade/effect_codegen.hpp"
@@ -299,6 +300,78 @@ namespace vkBasalt
         }
 
         return result;
+    }
+
+    // Built-in macros that should not be exposed to users
+    static const std::set<std::string> builtInMacros = {
+        "__RESHADE__",
+        "__RESHADE_PERFORMANCE_MODE__",
+        "__RENDERER__",
+        "BUFFER_WIDTH",
+        "BUFFER_HEIGHT",
+        "BUFFER_RCP_WIDTH",
+        "BUFFER_RCP_HEIGHT",
+        "BUFFER_COLOR_DEPTH",
+        "__FILE__",
+        "__LINE__",
+        "__DATE__",
+        "__TIME__",
+        "__VENDOR__",
+        "__APPLICATION__",
+        "RESHADE_DEPTH_INPUT_IS_UPSIDE_DOWN",
+        "RESHADE_DEPTH_INPUT_IS_REVERSED",
+        "RESHADE_DEPTH_INPUT_IS_LOGARITHMIC",
+        "RESHADE_DEPTH_LINEARIZATION_FAR_PLANE",
+        "RESHADE_DEPTH_MULTIPLIER",
+        "RESHADE_MIX_STAGE_DEPTH_MAP",
+    };
+
+    std::vector<PreprocessorDefinition> extractPreprocessorDefinitions(
+        const std::string& effectName,
+        const std::string& effectPath)
+    {
+        std::vector<PreprocessorDefinition> defs;
+
+        // Setup preprocessor
+        reshadefx::preprocessor preprocessor;
+        setupPreprocessor(preprocessor);
+
+        if (!preprocessor.append_file(effectPath))
+        {
+            Logger::err("extractPreprocessorDefinitions: failed to load shader: " + effectPath);
+            return defs;
+        }
+
+        // Get all macros that were actually used in the shader
+        auto usedMacros = preprocessor.used_macro_definitions();
+
+        for (const auto& [name, value] : usedMacros)
+        {
+            // Skip built-in macros
+            if (builtInMacros.count(name))
+                continue;
+
+            // Skip macros that start with underscore (internal/compiler)
+            if (!name.empty() && name[0] == '_')
+                continue;
+
+            PreprocessorDefinition def;
+            def.name = name;
+            def.effectName = effectName;
+            def.defaultValue = value.empty() ? "1" : value;
+            def.value = def.defaultValue;
+            defs.push_back(def);
+        }
+
+        if (!defs.empty())
+        {
+            Logger::debug("extractPreprocessorDefinitions: found " + std::to_string(defs.size()) +
+                " user macros in " + effectName);
+            for (const auto& def : defs)
+                Logger::debug("  " + def.name + " = " + def.defaultValue);
+        }
+
+        return defs;
     }
 
 } // namespace vkBasalt

@@ -477,11 +477,12 @@ namespace vkBasalt
             {
                 // ReShade effect - wrap in try-catch to handle compilation failures gracefully
                 std::string effectPath = effectRegistry.getEffectFilePath(effectStrings[i]);
+                auto customDefs = effectRegistry.getPreprocessorDefs(effectStrings[i]);
                 try
                 {
                     pLogicalSwapchain->effects.push_back(std::shared_ptr<Effect>(new ReshadeEffect(
                         pLogicalDevice, pLogicalSwapchain->format, pLogicalSwapchain->imageExtent,
-                        firstImages, secondImages, pConfig, effectStrings[i], effectPath)));
+                        firstImages, secondImages, pConfig, effectStrings[i], effectPath, customDefs)));
                 }
                 catch (const std::exception& e)
                 {

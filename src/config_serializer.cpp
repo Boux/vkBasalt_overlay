@@ -71,7 +71,8 @@ namespace vkBasalt
         const std::vector<std::string>& effects,
         const std::vector<std::string>& disabledEffects,
         const std::vector<EffectParam>& params,
-        const std::map<std::string, std::string>& effectPaths)
+        const std::map<std::string, std::string>& effectPaths,
+        const std::vector<PreprocessorDefinition>& preprocessorDefs)
     {
         std::string configsDir = getConfigsDir();
         if (configsDir.empty())
@@ -95,6 +96,11 @@ namespace vkBasalt
         for (const auto& param : params)
             paramsByEffect[param.effectName].push_back(&param);
 
+        // Group preprocessor defs by effect
+        std::map<std::string, std::vector<const PreprocessorDefinition*>> defsByEffect;
+        for (const auto& def : preprocessorDefs)
+            defsByEffect[def.effectName].push_back(&def);
+
         // Write params grouped by effect (always prefix with effectName.paramName)
         // Also write effect path before params for each effect
         for (const auto& [effectName, effectParams] : paramsByEffect)
@@ -106,13 +112,36 @@ namespace vkBasalt
                 file << effectName << " = " << pathIt->second << "\n";
             for (const auto* param : effectParams)
                 file << param->effectName << "." << param->paramName << " = " << param->value << "\n";
+            // Write preprocessor definitions for this effect (format: effectName#MACRO = value)
+            auto defsIt = defsByEffect.find(effectName);
+            if (defsIt != defsByEffect.end())
+            {
+                for (const auto* def : defsIt->second)
+                    file << def->effectName << "#" << def->name << " = " << def->value << "\n";
+            }
             file << "\n";
         }
 
-        // Write paths for effects that have no params but do have paths
+        // Write preprocessor defs for effects that have defs but no params
+        for (const auto& [effectName, effectDefs] : defsByEffect)
+        {
+            if (paramsByEffect.find(effectName) != paramsByEffect.end())
+                continue;  // Already written with params
+            file << "# " << effectName << "\n";
+            auto pathIt = effectPaths.find(effectName);
+            if (pathIt != effectPaths.end() && !pathIt->second.empty())
+                file << effectName << " = " << pathIt->second << "\n";
+            for (const auto* def : effectDefs)
+                file << def->effectName << "#" << def->name << " = " << def->value << "\n";
+            file << "\n";
+        }
+
+        // Write paths for effects that have no params or defs but do have paths
         for (const auto& [effectName, path] : effectPaths)
         {
-            if (!path.empty() && paramsByEffect.find(effectName) == paramsByEffect.end())
+            if (!path.empty() &&
+                paramsByEffect.find(effectName) == paramsByEffect.end() &&
+                defsByEffect.find(effectName) == defsByEffect.end())
             {
                 file << "# " << effectName << "\n";
                 file << effectName << " = " << path << "\n\n";

@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "imgui_overlay.hpp"
+#include "effect_config.hpp"
 #include "config.hpp"
 
 namespace vkBasalt
@@ -30,6 +31,13 @@ namespace vkBasalt
     // Test a ReShade .fx shader for compilation errors without creating Vulkan resources.
     // Returns a ShaderTestResult with success status and any error messages.
     ShaderTestResult testShaderCompilation(
+        const std::string& effectName,
+        const std::string& effectPath);
+
+    // Extract user-configurable preprocessor definitions from a ReShade shader.
+    // These are macros used via #ifndef/#ifdef that aren't built-in (like __RESHADE__).
+    // Returns empty vector for built-in effects or if no user macros are found.
+    std::vector<PreprocessorDefinition> extractPreprocessorDefinitions(
         const std::string& effectName,
         const std::string& effectPath);
 

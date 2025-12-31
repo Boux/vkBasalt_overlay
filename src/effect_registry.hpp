@@ -78,6 +78,13 @@ namespace vkBasalt
         // Set compilation error for an effect (marks it as failed)
         void setEffectError(const std::string& name, const std::string& error);
 
+        // Get preprocessor definitions for an effect (ReShade only)
+        std::vector<PreprocessorDefinition>& getPreprocessorDefs(const std::string& effectName);
+        const std::vector<PreprocessorDefinition>& getPreprocessorDefs(const std::string& effectName) const;
+
+        // Set a preprocessor definition value
+        void setPreprocessorDefValue(const std::string& effectName, const std::string& macroName, const std::string& value);
+
     private:
         std::vector<EffectConfig> effects;
         Config* pConfig = nullptr;

@@ -300,6 +300,55 @@ namespace vkBasalt
                     ImGui::PopID();
                     paramIndex++;
                 }
+
+                // Show preprocessor definitions (ReShade effects only)
+                if (pEffectRegistry)
+                {
+                    auto& defs = pEffectRegistry->getPreprocessorDefs(effectName);
+                    if (!defs.empty())
+                    {
+                        ImGui::Separator();
+                        ImGui::TextDisabled("Preprocessor:");
+                        if (ImGui::IsItemHovered())
+                            ImGui::SetTooltip("Compile-time macros. Changes require pressing %s to recompile.", settingsReloadKey);
+
+                        for (size_t defIdx = 0; defIdx < defs.size(); defIdx++)
+                        {
+                            auto& def = defs[defIdx];
+                            ImGui::PushID(static_cast<int>(defIdx + 1000));  // Offset to avoid collision with params
+
+                            char valueBuf[64];
+                            strncpy(valueBuf, def.value.c_str(), sizeof(valueBuf) - 1);
+                            valueBuf[sizeof(valueBuf) - 1] = '\0';
+
+                            ImGui::SetNextItemWidth(80);
+                            if (ImGui::InputText(def.name.c_str(), valueBuf, sizeof(valueBuf)))
+                            {
+                                pEffectRegistry->setPreprocessorDefValue(effectName, def.name, valueBuf);
+                                // Note: preprocessor changes need recompile, not just parameter update
+                            }
+
+                            // Show hint if value differs from default
+                            if (def.value != def.defaultValue)
+                            {
+                                ImGui::SameLine();
+                                ImGui::TextDisabled("(modified)");
+                            }
+
+                            // Double-click to reset to default
+                            if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0))
+                            {
+                                pEffectRegistry->setPreprocessorDefValue(effectName, def.name, def.defaultValue);
+                            }
+
+                            if (ImGui::IsItemHovered())
+                                ImGui::SetTooltip("Default: %s\nDouble-click to reset", def.defaultValue.c_str());
+
+                            ImGui::PopID();
+                        }
+                    }
+                }
+
                 ImGui::TreePop();
             }
         }

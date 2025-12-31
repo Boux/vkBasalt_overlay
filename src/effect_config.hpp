@@ -14,6 +14,16 @@ namespace vkBasalt
         ReShade   // .fx files
     };
 
+    // Preprocessor definition extracted from ReShade shader
+    // These are user-configurable compile-time constants (#define macros)
+    struct PreprocessorDefinition
+    {
+        std::string name;           // Macro name, e.g., "ENABLE_SCANLINES"
+        std::string value;          // Current value (will be passed to compiler)
+        std::string defaultValue;   // Default from shader or "1"
+        std::string effectName;     // Which effect this belongs to
+    };
+
     struct EffectConfig
     {
         std::string name;       // Instance name: "cas", "cas.2", "Clarity", etc.
@@ -22,6 +32,7 @@ namespace vkBasalt
         EffectType type = EffectType::BuiltIn;
         bool enabled = true;
         std::vector<EffectParameter> parameters;
+        std::vector<PreprocessorDefinition> preprocessorDefs;  // ReShade: user-configurable macros
         std::string compileError;  // Empty if compiled successfully, error message if failed
         bool hasFailed() const { return !compileError.empty(); }
     };

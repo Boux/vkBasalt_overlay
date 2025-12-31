@@ -37,17 +37,19 @@ namespace vkBasalt
                                  std::vector<VkImage> outputImages,
                                  Config*              pConfig,
                                  std::string          effectName,
-                                 std::string          effectPath)
+                                 std::string          effectPath,
+                                 std::vector<PreprocessorDefinition> customDefs)
     {
         Logger::debug("in creating ReshadeEffect");
 
-        this->pLogicalDevice   = pLogicalDevice;
-        this->imageExtent      = imageExtent;
-        this->inputImages      = inputImages;
-        this->outputImages     = outputImages;
-        this->pConfig          = pConfig;
-        this->effectName       = effectName;
-        this->effectPath       = effectPath;
+        this->pLogicalDevice        = pLogicalDevice;
+        this->imageExtent           = imageExtent;
+        this->inputImages           = inputImages;
+        this->outputImages          = outputImages;
+        this->pConfig               = pConfig;
+        this->effectName            = effectName;
+        this->effectPath            = effectPath;
+        this->customPreprocessorDefs = customDefs;
         inputOutputFormatUNORM = convertToUNORM(format);
         inputOutputFormatSRGB  = convertToSRGB(format);
 
@@ -1258,6 +1260,14 @@ namespace vkBasalt
         preprocessor.add_macro_definition("BUFFER_RCP_WIDTH", "(1.0 / BUFFER_WIDTH)");
         preprocessor.add_macro_definition("BUFFER_RCP_HEIGHT", "(1.0 / BUFFER_HEIGHT)");
         preprocessor.add_macro_definition("BUFFER_COLOR_DEPTH", (inputOutputFormatUNORM == VK_FORMAT_A2R10G10B10_UNORM_PACK32) ? "10" : "8");
+
+        // Add custom preprocessor definitions (user-configurable macros)
+        for (const auto& def : customPreprocessorDefs)
+        {
+            preprocessor.add_macro_definition(def.name, def.value);
+            Logger::debug("  custom macro: " + def.name + " = " + def.value);
+        }
+
         // Add all discovered shader paths from shader manager
         ShaderManagerConfig shaderMgrConfig = ConfigSerializer::loadShaderManagerConfig();
         for (const auto& path : shaderMgrConfig.discoveredShaderPaths)

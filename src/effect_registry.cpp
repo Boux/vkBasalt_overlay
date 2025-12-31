@@ -230,8 +230,26 @@ namespace vkBasalt
         {
             // Only parse parameters if compilation succeeded
             config.parameters = parseReshadeEffect(name, path, pConfig);
+
+            // Extract preprocessor definitions (user-configurable macros)
+            config.preprocessorDefs = extractPreprocessorDefinitions(name, path);
+
+            // Override default values with any saved values from config
+            // Config format: effectName#MACRO = value
+            for (auto& def : config.preprocessorDefs)
+            {
+                std::string configKey = name + "#" + def.name;
+                std::string savedValue = pConfig->getOption<std::string>(configKey, "");
+                if (!savedValue.empty())
+                {
+                    def.value = savedValue;
+                    Logger::debug("EffectRegistry: loaded preprocessor def " + configKey + " = " + savedValue);
+                }
+            }
+
             Logger::debug("EffectRegistry: loaded ReShade effect " + name + " with " +
-                          std::to_string(config.parameters.size()) + " parameters");
+                          std::to_string(config.parameters.size()) + " parameters and " +
+                          std::to_string(config.preprocessorDefs.size()) + " preprocessor defs");
         }
 
         effects.push_back(config);
@@ -472,6 +490,40 @@ namespace vkBasalt
         }
 
         initReshadeEffect(instanceName, path);
+    }
+
+    // Static empty vector for returning when effect not found
+    static std::vector<PreprocessorDefinition> emptyDefs;
+
+    std::vector<PreprocessorDefinition>& EffectRegistry::getPreprocessorDefs(const std::string& effectName)
+    {
+        std::lock_guard<std::mutex> lock(mutex);
+        EffectConfig* effect = findEffect(effectName);
+        return effect ? effect->preprocessorDefs : emptyDefs;
+    }
+
+    const std::vector<PreprocessorDefinition>& EffectRegistry::getPreprocessorDefs(const std::string& effectName) const
+    {
+        std::lock_guard<std::mutex> lock(mutex);
+        const EffectConfig* effect = findEffect(effectName);
+        return effect ? effect->preprocessorDefs : emptyDefs;
+    }
+
+    void EffectRegistry::setPreprocessorDefValue(const std::string& effectName, const std::string& macroName, const std::string& value)
+    {
+        std::lock_guard<std::mutex> lock(mutex);
+        EffectConfig* effect = findEffect(effectName);
+        if (!effect)
+            return;
+
+        for (auto& def : effect->preprocessorDefs)
+        {
+            if (def.name == macroName)
+            {
+                def.value = value;
+                return;
+            }
+        }
     }
 
 } // namespace vkBasalt
