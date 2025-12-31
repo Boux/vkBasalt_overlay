@@ -22,15 +22,20 @@ Feature showcase: https://www.youtube.com/watch?v=_KJTToAynr0
 
 - Mouse input can be weird in some games (especially first person shooters or games that hide your cursor). It will sometimes lock the cursor to the middle of the screen and you have to pause the game or open a menu to be able to use the mouse. Also be careful not to accidentally click things behind the overlay! I am not sure how to fix this issue, there is a really bad workaround that you can enable in the settings where it just force-grabs the cursor with X11 calls, but it's janky as hell. If anybody got any ideas I'm listening.
 
-## Features
+## Features (vs Upstream vkBasalt)
 
-- **In-Game Overlay** - Press `End` to configure effects without leaving your game
-- **Dockable Windows** - Drag tabs out to create separate floating windows
-- **Effect Management** - Add, remove, reorder, and configure effects in real-time
-- **Config Management** - Save and load named effect configurations
-- **Shader Manager** - Manage ReShade shader paths and test shader compatibility
-- **Diagnostics** - FPS, frame time graphs, GPU usage, and memory stats (AMD)
-- **Up to 200 Effects** - Large effect chains with VRAM usage estimates
+Upstream requires editing config files and restarting. This fork adds:
+
+- **In-game overlay** (`End` key) with dockable windows
+- **Add/remove/reorder effects** without restart
+- **Parameter sliders** for all types (float, int, bool, vectors)
+- **Save/load named configs**
+- **Shader manager** - browse and test ReShade shaders
+- **Diagnostics** - FPS, frame time, GPU/VRAM usage (AMD)
+- **Debug window** - effect state, log viewer, error display
+- **Auto-apply** - changes apply after configurable delay
+- **Up to 200 effects** with VRAM estimates
+- **Graceful error handling** - failed effects show errors instead of crashing
 
 ### Built-in Effects
 - **CAS** - Contrast Adaptive Sharpening
