@@ -173,6 +173,7 @@ namespace vkBasalt
         char settingsOverlayKey[32] = "End";
         bool settingsEnableOnLaunch = true;
         bool settingsDepthCapture = false;
+        int settingsAutoApplyDelay = 200;  // ms delay before auto-applying changes
         bool settingsInitialized = false;
         int listeningForKey = 0;  // 0=none, 1=toggle, 2=reload, 3=overlay
         bool settingsSaved = false;  // True when settings saved, cleared by basalt.cpp

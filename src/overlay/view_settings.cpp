@@ -74,6 +74,12 @@ namespace vkBasalt
         if (settingsMaxEffects < 1) settingsMaxEffects = 1;
         if (settingsMaxEffects > 50) settingsMaxEffects = 50;
 
+        ImGui::Text("Auto-apply Delay:");
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Delay before automatically applying parameter changes.\nLower values feel more responsive, higher values reduce stutter.");
+        ImGui::SetNextItemWidth(150);
+        ImGui::SliderInt("##autoApplyDelay", &settingsAutoApplyDelay, 20, 1000, "%d ms");
+
         ImGui::Spacing();
         ImGui::Text("Startup Behavior");
         ImGui::Separator();
@@ -99,6 +105,7 @@ namespace vkBasalt
             newSettings.overlayKey = settingsOverlayKey;
             newSettings.enableOnLaunch = settingsEnableOnLaunch;
             newSettings.depthCapture = settingsDepthCapture;
+            newSettings.autoApplyDelay = settingsAutoApplyDelay;
             ConfigSerializer::saveSettings(newSettings);
             settingsSaved = true;  // Signal basalt.cpp to reload keybindings
         }

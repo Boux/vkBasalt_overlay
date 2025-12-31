@@ -154,6 +154,7 @@ namespace vkBasalt
             strncpy(settingsOverlayKey, currentSettings.overlayKey.c_str(), sizeof(settingsOverlayKey) - 1);
             settingsEnableOnLaunch = currentSettings.enableOnLaunch;
             settingsDepthCapture = currentSettings.depthCapture;
+            settingsAutoApplyDelay = currentSettings.autoApplyDelay;
             settingsInitialized = true;
         }
 
@@ -413,12 +414,12 @@ namespace vkBasalt
             saveToPersistentState();
         }
 
-        // Auto-apply with debounce (200ms after last change)
+        // Auto-apply with debounce (configurable delay after last change)
         if (autoApply && paramsDirty && !changedThisFrame)
         {
             auto now = std::chrono::steady_clock::now();
             auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastChangeTime).count();
-            if (elapsed >= 200)
+            if (elapsed >= settingsAutoApplyDelay)
             {
                 applyRequested = true;
                 paramsDirty = false;

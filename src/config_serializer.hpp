@@ -26,6 +26,7 @@ namespace vkBasalt
         std::string overlayKey = "End";
         bool enableOnLaunch = true;
         bool depthCapture = false;
+        int autoApplyDelay = 200;  // ms delay before auto-applying changes
     };
 
     // Shader Manager configuration (from shader_manager.conf)
