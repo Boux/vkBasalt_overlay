@@ -569,6 +569,14 @@ namespace vkBasalt
             renderDiagnosticsView();
         ImGui::End();
 
+        // Focus Effects window on first frame of the session
+        static bool firstFrame = true;
+        if (firstFrame)
+        {
+            ImGui::SetWindowFocus("Effects");
+            firstFrame = false;
+        }
+
         ImGui::Render();
 
         // Begin render pass
