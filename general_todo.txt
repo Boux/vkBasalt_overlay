@@ -1,8 +1,5 @@
 - rework input blocking logic (it's pretty janky)
 - native wayland support for GUI
 - manually edit param value
-- lut built-in effect crashes the game
 - fix depth capture
-
-- auto-save shader manager
 - save button feedback
