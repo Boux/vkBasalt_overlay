@@ -4,10 +4,9 @@ layout(set=0, binding=0) uniform sampler2D originalImage;
 layout(set=0, binding=1) uniform sampler2D effectedImage;
 layout(set=0, binding=2) uniform sampler2D depthImage;
 
-layout(constant_id = 0) const float depthThreshold = 0.9999;
-
 layout(push_constant) uniform PushConstants {
-    int enabled;  // 0 = passthrough, 1 = depth masking
+    int enabled;           // 0 = passthrough, 1 = depth masking
+    float depthThreshold;  // Threshold for UI detection (default 0.9999)
 } pushConstants;
 
 layout(location = 0) in vec2 textureCoord;
@@ -32,5 +31,5 @@ void main()
     // 3D world pixels have depth < 1.0
     // Keep original (no effects) where depth >= threshold (UI)
     // Apply effects where depth < threshold (3D world)
-    fragColor = (depth >= depthThreshold) ? original : effected;
+    fragColor = (depth >= pushConstants.depthThreshold) ? original : effected;
 }

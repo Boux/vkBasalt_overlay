@@ -63,11 +63,12 @@ namespace vkBasalt
         // Create render pass
         renderPass = createRenderPass(pLogicalDevice, format);
 
-        // Create pipeline layout with push constant for enabled flag
+        // Create pipeline layout with push constants for enabled flag and threshold
+        // Push constant struct: { int enabled; float depthThreshold; } = 8 bytes
         VkPushConstantRange pushConstantRange = {};
         pushConstantRange.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
         pushConstantRange.offset     = 0;
-        pushConstantRange.size       = sizeof(int32_t);
+        pushConstantRange.size       = sizeof(int32_t) + sizeof(float);  // 8 bytes
 
         VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
         pipelineLayoutInfo.sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -80,28 +81,13 @@ namespace vkBasalt
             pLogicalDevice->device, &pipelineLayoutInfo, nullptr, &pipelineLayout);
         ASSERT_VULKAN(layoutResult);
 
-        // Get threshold from config
-        float depthThreshold = pConfig->getOption<float>("depthMaskThreshold", 0.9999f);
-
-        // Set up specialization constant for threshold
-        VkSpecializationMapEntry thresholdMapEntry;
-        thresholdMapEntry.constantID = 0;
-        thresholdMapEntry.offset     = 0;
-        thresholdMapEntry.size       = sizeof(float);
-
-        VkSpecializationInfo fragmentSpecializationInfo;
-        fragmentSpecializationInfo.mapEntryCount = 1;
-        fragmentSpecializationInfo.pMapEntries   = &thresholdMapEntry;
-        fragmentSpecializationInfo.dataSize      = sizeof(float);
-        fragmentSpecializationInfo.pData         = &depthThreshold;
-
-        // Create graphics pipeline
+        // Create graphics pipeline (no specialization constants - using push constants instead)
         graphicsPipeline = createGraphicsPipeline(pLogicalDevice,
                                                   vertexModule,
                                                   nullptr,
                                                   "main",
                                                   fragmentModule,
-                                                  &fragmentSpecializationInfo,
+                                                  nullptr,
                                                   "main",
                                                   imageExtent,
                                                   renderPass,
@@ -253,9 +239,16 @@ namespace vkBasalt
 
         pLogicalDevice->vkd.CmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
 
-        // Push enabled flag (0 = passthrough, 1 = depth masking)
+        // Push constants: enabled flag and depth threshold
+        struct PushConstants {
+            int32_t enabled;
+            float depthThreshold;
+        } pushConstants;
+        pushConstants.enabled = enabledFlag;
+        pushConstants.depthThreshold = settingsManager.getDepthMaskThreshold();
+
         pLogicalDevice->vkd.CmdPushConstants(
-            commandBuffer, pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(int32_t), &enabledFlag);
+            commandBuffer, pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pushConstants), &pushConstants);
 
         pLogicalDevice->vkd.CmdDraw(commandBuffer, 3, 1, 0, 0);
 

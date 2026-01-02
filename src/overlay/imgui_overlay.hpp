@@ -33,9 +33,9 @@ namespace vkBasalt
 
     // UI preferences that persist across swapchain recreation
     // Effect-related state is managed by EffectRegistry
+    // Note: autoApply is now in SettingsManager (persisted to vkBasalt.conf)
     struct OverlayPersistentState
     {
-        bool autoApply = true;
         bool visible = false;
     };
 
@@ -160,7 +160,6 @@ namespace vkBasalt
         bool isDragging = false;    // True while actively dragging
         bool applyRequested = false;
         bool toggleEffectsRequested = false;
-        bool autoApply = true;
         bool paramsDirty = false;  // True when params changed, waiting for debounce
         std::chrono::steady_clock::time_point lastChangeTime;
         bool visible = false;

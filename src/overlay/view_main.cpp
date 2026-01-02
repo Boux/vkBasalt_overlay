@@ -340,10 +340,12 @@ namespace vkBasalt
         ImGui::EndChild();
 
         ImGui::Separator();
-        bool prevAutoApply = autoApply;
-        ImGui::Checkbox("Apply automatically", &autoApply);
-        if (autoApply != prevAutoApply)
-            saveToPersistentState();
+        bool autoApplyValue = settingsManager.getAutoApply();
+        if (ImGui::Checkbox("Apply automatically", &autoApplyValue))
+        {
+            settingsManager.setAutoApply(autoApplyValue);
+            settingsManager.save();
+        }
         float applyWidth = ImGui::CalcTextSize("Apply").x + ImGui::GetStyle().FramePadding.x * 2;
         ImGui::SameLine(ImGui::GetWindowWidth() - applyWidth - ImGui::GetStyle().WindowPadding.x);
 
@@ -356,7 +358,7 @@ namespace vkBasalt
         }
 
         // Auto-apply with debounce (configurable delay after last change)
-        if (autoApply && paramsDirty && !changedThisFrame)
+        if (settingsManager.getAutoApply() && paramsDirty && !changedThisFrame)
         {
             auto now = std::chrono::steady_clock::now();
             auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastChangeTime).count();

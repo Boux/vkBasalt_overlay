@@ -104,15 +104,30 @@ namespace vkBasalt
         else
             ImGui::TextDisabled("~%d MB @ %ux%u", estimatedVramMB, currentWidth, currentHeight);
 
-        ImGui::Text("Auto-apply Delay:");
+        bool autoApply = settingsManager.getAutoApply();
+        if (ImGui::Checkbox("Auto-apply Changes", &autoApply))
+        {
+            settingsManager.setAutoApply(autoApply);
+            saveSettings();
+        }
         if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Delay before automatically applying parameter changes.\nLower values feel more responsive, higher values reduce stutter.");
-        ImGui::SetNextItemWidth(150);
-        int autoApplyDelayValue = settingsManager.getAutoApplyDelay();
-        if (ImGui::SliderInt("##autoApplyDelay", &autoApplyDelayValue, 20, 1000, "%d ms"))
-            settingsManager.setAutoApplyDelay(autoApplyDelayValue);  // Update immediately while dragging
-        if (ImGui::IsItemDeactivatedAfterEdit())
-            saveSettings();  // Save to file only on release
+            ImGui::SetTooltip("Automatically apply parameter and effect changes.\nDisable to manually click Apply after each change.");
+
+        if (autoApply)
+        {
+            ImGui::Indent();
+            ImGui::Text("Delay:");
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Delay before automatically applying changes.\nLower values feel more responsive, higher values reduce stutter.");
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(120);
+            int autoApplyDelayValue = settingsManager.getAutoApplyDelay();
+            if (ImGui::SliderInt("##autoApplyDelay", &autoApplyDelayValue, 20, 1000, "%d ms"))
+                settingsManager.setAutoApplyDelay(autoApplyDelayValue);
+            if (ImGui::IsItemDeactivatedAfterEdit())
+                saveSettings();
+            ImGui::Unindent();
+        }
 
         ImGui::Spacing();
         ImGui::Text("Startup Behavior");
@@ -156,6 +171,22 @@ namespace vkBasalt
             ImGui::Spacing();
             ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.4f, 1.0f), "May not work with all games.");
             ImGui::EndTooltip();
+        }
+
+        // Depth threshold slider (only show when depth masking is enabled)
+        if (depthCapture)
+        {
+            ImGui::Indent();
+            ImGui::Text("Depth Threshold:");
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Pixels with depth >= threshold are considered UI.\nHigher = more UI preserved, lower = more effects applied.");
+            ImGui::SetNextItemWidth(150);
+            float threshold = settingsManager.getDepthMaskThreshold();
+            if (ImGui::SliderFloat("##depthThreshold", &threshold, 0.9f, 1.0f, "%.4f"))
+                settingsManager.setDepthMaskThreshold(threshold);
+            if (ImGui::IsItemDeactivatedAfterEdit())
+                saveSettings();
+            ImGui::Unindent();
         }
 
         bool showDebugWindow = settingsManager.getShowDebugWindow();
