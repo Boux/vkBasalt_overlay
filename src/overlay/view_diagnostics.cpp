@@ -13,8 +13,8 @@
 namespace vkBasalt
 {
     // Build version - increment this each build
-    static constexpr int BUILD_NUMBER = 8;
-    static constexpr const char* BUILD_DATE = "2025-12-31";
+    static constexpr int BUILD_NUMBER = 9;
+    static constexpr const char* BUILD_DATE = "2026-01-01";
     namespace
     {
         // Ring buffer for storing history
@@ -330,6 +330,10 @@ namespace vkBasalt
         ImGui::Spacing();
         ImGui::Spacing();
         ImGui::TextDisabled("Build #%d (%s)", BUILD_NUMBER, BUILD_DATE);
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.8f, 0.3f, 1.0f));
+        ImGui::TextWrapped("This is an early beta build. Please report any issues or bugs to:");
+        ImGui::PopStyleColor();
+        ImGui::TextLinkOpenURL("github.com/Boux/vkBasalt_overlay/issues", "https://github.com/Boux/vkBasalt_overlay/issues");
 
         ImGui::EndChild();
     }

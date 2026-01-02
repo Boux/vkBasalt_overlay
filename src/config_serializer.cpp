@@ -265,6 +265,8 @@ namespace vkBasalt
                 settings.enableOnLaunch = (value == "true" || value == "1");
             else if (key == "depthCapture")
                 settings.depthCapture = (value == "on");
+            else if (key == "autoApply")
+                settings.autoApply = (value == "true" || value == "1");
             else if (key == "autoApplyDelay")
                 settings.autoApplyDelay = std::stoi(value);
             else if (key == "showDebugWindow")
@@ -299,6 +301,7 @@ namespace vkBasalt
         file << "# Overlay settings\n";
         file << "overlayBlockInput = " << (settings.overlayBlockInput ? "true" : "false") << "\n";
         file << "maxEffects = " << settings.maxEffects << "\n";
+        file << "autoApply = " << (settings.autoApply ? "true" : "false") << "\n";
         file << "autoApplyDelay = " << settings.autoApplyDelay << "\n";
 
         file << "\n# Key bindings\n";

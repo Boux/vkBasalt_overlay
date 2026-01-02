@@ -1,5 +1,6 @@
 #include "imgui_overlay.hpp"
 #include "effects/effect_registry.hpp"
+#include "settings_manager.hpp"
 #include "logger.hpp"
 
 #include <cctype>
@@ -11,14 +12,29 @@ namespace vkBasalt
 {
     void ImGuiOverlay::renderDebugWindow()
     {
-        if (!settingsShowDebugWindow)
+        if (!settingsManager.getShowDebugWindow())
             return;
 
+        // Local bool for ImGui window close button
+        bool showDebugWindow = true;
         ImGui::SetNextWindowSize(ImVec2(600, 400), ImGuiCond_FirstUseEver);
-        if (!ImGui::Begin("Debug Window", &settingsShowDebugWindow))
+        if (!ImGui::Begin("Debug Window", &showDebugWindow))
         {
             ImGui::End();
+            // User closed the window via X button
+            if (!showDebugWindow)
+            {
+                settingsManager.setShowDebugWindow(false);
+                settingsManager.save();
+            }
             return;
+        }
+
+        // Check if user closed via X button
+        if (!showDebugWindow)
+        {
+            settingsManager.setShowDebugWindow(false);
+            settingsManager.save();
         }
 
         // Tab bar for different debug views
