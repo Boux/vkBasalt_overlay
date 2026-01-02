@@ -21,6 +21,7 @@ Feature showcase (slightly outdated): https://www.youtube.com/watch?v=_KJTToAynr
 ## Bugs and Jank
 
 - Mouse input can be weird in some games (especially first person shooters or games that hide your cursor). It will sometimes lock the cursor to the middle of the screen and you have to pause the game or open a menu to be able to use the mouse. Also be careful not to accidentally click things behind the overlay! I am not sure how to fix this issue, there is a really bad workaround that you can enable in the settings where it just force-grabs the cursor with X11 calls, but it's janky as hell. If anybody got any ideas I'm listening.
+- Don't enable a bunch of GPU intensive shaders all at once when your GPU is already running at 100% usage. ImGui will freak the fuck out and vertex explode on your ass for about 2 seconds until your entire system hard-crashes.
 
 ## Features
 
