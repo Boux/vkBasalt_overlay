@@ -36,6 +36,7 @@ namespace vkBasalt
         bool getEnableOnLaunch() const { return settings.enableOnLaunch; }
         bool getDepthCapture() const { return settings.depthCapture; }
         float getDepthMaskThreshold() const { return settings.depthMaskThreshold; }
+        bool getDepthMaskReversed() const { return settings.depthMaskReversed; }
         bool getAutoApply() const { return settings.autoApply; }
         int getAutoApplyDelay() const { return settings.autoApplyDelay; }
         bool getShowDebugWindow() const { return settings.showDebugWindow; }
@@ -49,6 +50,7 @@ namespace vkBasalt
         void setEnableOnLaunch(bool value) { settings.enableOnLaunch = value; }
         void setDepthCapture(bool value) { settings.depthCapture = value; }
         void setDepthMaskThreshold(float value) { settings.depthMaskThreshold = value; }
+        void setDepthMaskReversed(bool value) { settings.depthMaskReversed = value; }
         void setAutoApply(bool value) { settings.autoApply = value; }
         void setAutoApplyDelay(int value) { settings.autoApplyDelay = value; }
         void setShowDebugWindow(bool value) { settings.showDebugWindow = value; }

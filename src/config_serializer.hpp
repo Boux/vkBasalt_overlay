@@ -28,6 +28,7 @@ namespace vkBasalt
         bool enableOnLaunch = true;
         bool depthCapture = false;
         float depthMaskThreshold = 0.9999f;  // Depth threshold for UI masking
+        bool depthMaskReversed = false;  // DXVK uses reversed depth (near=1, far=0)
         bool autoApply = true;  // Auto-apply changes without clicking Apply
         int autoApplyDelay = 200;  // ms delay before auto-applying changes
         bool showDebugWindow = false;  // Show debug window with raw effect registry data

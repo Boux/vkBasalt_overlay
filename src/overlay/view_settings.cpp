@@ -175,16 +175,16 @@ namespace vkBasalt
             ImGui::EndTooltip();
         }
 
-        // Depth threshold slider (only show when depth masking is enabled)
+        // Depth threshold slider and reversed toggle (only show when depth masking is enabled)
         if (depthCapture)
         {
             ImGui::Indent();
             ImGui::Text("Depth Threshold:");
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("Pixels with depth >= threshold are considered UI.\nHigher = more UI preserved, lower = more effects applied.");
+                ImGui::SetTooltip("Pixels with depth >= threshold are considered UI.\nHigher = more UI preserved, lower = more effects applied.\n\nDebug: Set below 0.5 to visualize depth buffer.");
             ImGui::SetNextItemWidth(150);
             float threshold = settingsManager.getDepthMaskThreshold();
-            if (ImGui::SliderFloat("##depthThreshold", &threshold, 0.9f, 1.0f, "%.4f"))
+            if (ImGui::SliderFloat("##depthThreshold", &threshold, 0.0f, 1.0f, "%.4f"))
             {
                 settingsManager.setDepthMaskThreshold(threshold);
                 paramsDirty = true;
@@ -192,6 +192,23 @@ namespace vkBasalt
             }
             if (ImGui::IsItemDeactivatedAfterEdit())
                 saveSettings();
+
+            bool reversed = settingsManager.getDepthMaskReversed();
+            if (ImGui::Checkbox("Reversed Depth (DXVK)", &reversed))
+            {
+                settingsManager.setDepthMaskReversed(reversed);
+                paramsDirty = true;
+                lastChangeTime = std::chrono::steady_clock::now();
+                saveSettings();
+            }
+            if (ImGui::IsItemHovered())
+            {
+                ImGui::BeginTooltip();
+                ImGui::Text("Enable for DXVK/D3D games (near=1, far=0).");
+                ImGui::TextDisabled("Normal Vulkan: near=0, far=1 (background at 1.0)");
+                ImGui::TextDisabled("DXVK reversed: near=1, far=0 (background at 0.0)");
+                ImGui::EndTooltip();
+            }
             ImGui::Unindent();
         }
 

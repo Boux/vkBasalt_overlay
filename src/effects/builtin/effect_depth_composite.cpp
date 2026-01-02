@@ -63,12 +63,12 @@ namespace vkBasalt
         // Create render pass
         renderPass = createRenderPass(pLogicalDevice, format);
 
-        // Create pipeline layout with push constants for enabled flag and threshold
-        // Push constant struct: { int enabled; float depthThreshold; } = 8 bytes
+        // Create pipeline layout with push constants for enabled flag, threshold, and reversed flag
+        // Push constant struct: { int enabled; float depthThreshold; int reversed; } = 12 bytes
         VkPushConstantRange pushConstantRange = {};
         pushConstantRange.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
         pushConstantRange.offset     = 0;
-        pushConstantRange.size       = sizeof(int32_t) + sizeof(float);  // 8 bytes
+        pushConstantRange.size       = sizeof(int32_t) + sizeof(float) + sizeof(int32_t);  // 12 bytes
 
         VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
         pipelineLayoutInfo.sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -239,13 +239,15 @@ namespace vkBasalt
 
         pLogicalDevice->vkd.CmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
 
-        // Push constants: enabled flag and depth threshold
+        // Push constants: enabled flag, depth threshold, and reversed flag
         struct PushConstants {
             int32_t enabled;
             float depthThreshold;
+            int32_t reversed;
         } pushConstants;
         pushConstants.enabled = enabledFlag;
         pushConstants.depthThreshold = settingsManager.getDepthMaskThreshold();
+        pushConstants.reversed = settingsManager.getDepthMaskReversed() ? 1 : 0;
 
         pLogicalDevice->vkd.CmdPushConstants(
             commandBuffer, pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pushConstants), &pushConstants);

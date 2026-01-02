@@ -267,6 +267,8 @@ namespace vkBasalt
                 settings.depthCapture = (value == "on");
             else if (key == "depthMaskThreshold")
                 settings.depthMaskThreshold = std::stof(value);
+            else if (key == "depthMaskReversed")
+                settings.depthMaskReversed = (value == "true" || value == "1");
             else if (key == "autoApply")
                 settings.autoApply = (value == "true" || value == "1");
             else if (key == "autoApplyDelay")
@@ -317,6 +319,7 @@ namespace vkBasalt
         file << "\n# Depth masking\n";
         file << "depthCapture = " << (settings.depthCapture ? "on" : "off") << "\n";
         file << "depthMaskThreshold = " << settings.depthMaskThreshold << "\n";
+        file << "depthMaskReversed = " << (settings.depthMaskReversed ? "true" : "false") << "\n";
 
         file << "\n# Debug\n";
         file << "showDebugWindow = " << (settings.showDebugWindow ? "true" : "false") << "\n";

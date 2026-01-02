@@ -132,6 +132,68 @@ namespace vkBasalt
                 ImGui::EndTabItem();
             }
 
+            // Depth tab (only visible when depth masking is enabled)
+            if (settingsManager.getDepthCapture())
+            {
+                if (ImGui::BeginTabItem("Depth"))
+                {
+                    debugWindowTab = 2;
+
+                    ImGui::Text("Depth Masking Status");
+                    ImGui::Separator();
+
+                    // Show current settings
+                    bool depthEnabled = settingsManager.getDepthCapture();
+                    float threshold = settingsManager.getDepthMaskThreshold();
+                    bool reversed = settingsManager.getDepthMaskReversed();
+
+                    ImGui::BulletText("Depth Masking: %s", depthEnabled ? "Enabled" : "Disabled");
+                    ImGui::BulletText("Threshold: %.4f", threshold);
+                    ImGui::BulletText("Reversed Depth (DXVK): %s", reversed ? "Yes" : "No");
+
+                    ImGui::Spacing();
+                    ImGui::Text("Depth Mode:");
+                    ImGui::Separator();
+                    if (reversed)
+                    {
+                        ImGui::TextDisabled("Using DXVK reversed depth:");
+                        ImGui::TextDisabled("  Near plane = 1.0");
+                        ImGui::TextDisabled("  Far plane = 0.0");
+                        ImGui::TextDisabled("  UI detection: depth < %.4f", 1.0f - threshold);
+                    }
+                    else
+                    {
+                        ImGui::TextDisabled("Using standard Vulkan depth:");
+                        ImGui::TextDisabled("  Near plane = 0.0");
+                        ImGui::TextDisabled("  Far plane = 1.0");
+                        ImGui::TextDisabled("  UI detection: depth > %.4f", threshold);
+                    }
+
+                    ImGui::Spacing();
+                    ImGui::Text("Debug Visualization");
+                    ImGui::Separator();
+                    ImGui::TextWrapped("To visualize the depth buffer, set threshold below 0.5 in Settings.");
+                    ImGui::Spacing();
+                    ImGui::TextDisabled("When threshold < 0.5:");
+                    ImGui::TextDisabled("  Black = near objects (close to camera)");
+                    ImGui::TextDisabled("  White = far objects (background/UI)");
+
+                    ImGui::Spacing();
+                    ImGui::Text("Troubleshooting");
+                    ImGui::Separator();
+                    ImGui::TextWrapped("If effects apply to UI elements:");
+                    ImGui::BulletText("Try enabling 'Reversed Depth' for DXVK/D3D games");
+                    ImGui::BulletText("Lower the threshold (e.g., 0.999 or 0.99)");
+                    ImGui::BulletText("Use debug visualization to see depth values");
+                    ImGui::Spacing();
+                    ImGui::TextWrapped("If effects never apply to 3D world:");
+                    ImGui::BulletText("Increase threshold closer to 1.0");
+                    ImGui::BulletText("Game may not expose depth buffer to vkBasalt");
+
+                    ImGui::EndTabItem();
+                }
+            }
+
             // Log tab
             if (ImGui::BeginTabItem("Log"))
             {
