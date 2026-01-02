@@ -1,6 +1,7 @@
 #include "imgui_overlay.hpp"
 #include "effects/effect_registry.hpp"
 #include "config_serializer.hpp"
+#include "settings_manager.hpp"
 #include "params/field_editor.hpp"
 #include "logger.hpp"
 
@@ -81,21 +82,14 @@ namespace vkBasalt
             inConfigManageMode = true;
         ImGui::Separator();
 
-        // Initialize settings if not done yet (needed for key display)
+        // Initialize key buffers from settings manager (needed for key display in UI)
         if (!settingsInitialized)
         {
-            VkBasaltSettings currentSettings = ConfigSerializer::loadSettings();
-            settingsMaxEffects = currentSettings.maxEffects;
-            maxEffects = static_cast<size_t>(currentSettings.maxEffects);
-            settingsBlockInput = currentSettings.overlayBlockInput;
-            strncpy(settingsToggleKey, currentSettings.toggleKey.c_str(), sizeof(settingsToggleKey) - 1);
-            strncpy(settingsReloadKey, currentSettings.reloadKey.c_str(), sizeof(settingsReloadKey) - 1);
-            strncpy(settingsOverlayKey, currentSettings.overlayKey.c_str(), sizeof(settingsOverlayKey) - 1);
-            settingsEnableOnLaunch = currentSettings.enableOnLaunch;
-            settingsDepthCapture = currentSettings.depthCapture;
-            settingsAutoApplyDelay = currentSettings.autoApplyDelay;
-            settingsShowDebugWindow = currentSettings.showDebugWindow;
-            Logger::setHistoryEnabled(settingsShowDebugWindow);
+            strncpy(settingsToggleKey, settingsManager.getToggleKey().c_str(), sizeof(settingsToggleKey) - 1);
+            strncpy(settingsReloadKey, settingsManager.getReloadKey().c_str(), sizeof(settingsReloadKey) - 1);
+            strncpy(settingsOverlayKey, settingsManager.getOverlayKey().c_str(), sizeof(settingsOverlayKey) - 1);
+            maxEffects = static_cast<size_t>(settingsManager.getMaxEffects());
+            Logger::setHistoryEnabled(settingsManager.getShowDebugWindow());
             settingsInitialized = true;
         }
 
@@ -366,7 +360,7 @@ namespace vkBasalt
         {
             auto now = std::chrono::steady_clock::now();
             auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastChangeTime).count();
-            if (elapsed >= settingsAutoApplyDelay)
+            if (elapsed >= settingsManager.getAutoApplyDelay())
             {
                 applyRequested = true;
                 paramsDirty = false;

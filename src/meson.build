@@ -64,6 +64,7 @@ vkBasalt_src = [
     'renderpass.cpp',
     'reshade_uniforms.cpp',
     'sampler.cpp',
+    'settings_manager.cpp',
     'shader.cpp',
     'stb_image.c',
     'stb_image_resize.c',

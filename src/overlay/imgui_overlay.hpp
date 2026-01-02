@@ -138,21 +138,20 @@ namespace vkBasalt
         std::vector<std::pair<std::string, std::string>> shaderTestQueue;  // {effectName, filePath}
         std::vector<std::tuple<std::string, std::string, bool, std::string>> shaderTestResults;  // {name, path, success, error}
 
-        // Settings state (editable copies of config values)
-        int settingsMaxEffects = 10;
-        bool settingsBlockInput = false;
+        // Settings state - only buffers for ImGui text editing of keybindings
+        // All actual settings values are read from settingsManager (single source of truth)
         char settingsToggleKey[32] = "Home";
         char settingsReloadKey[32] = "F10";
         char settingsOverlayKey[32] = "End";
-        bool settingsEnableOnLaunch = true;
-        bool settingsDepthCapture = false;
-        int settingsAutoApplyDelay = 200;  // ms delay before auto-applying changes
         bool settingsInitialized = false;
         int listeningForKey = 0;  // 0=none, 1=toggle, 2=reload, 3=overlay
-        bool settingsShowDebugWindow = false;  // Show debug window
+
+        // Debug window UI state
         int debugWindowTab = 0;  // 0=Registry, 1=Log
         bool debugLogFilters[5] = {true, true, true, true, true};  // Trace, Debug, Info, Warn, Error
         char debugLogSearch[128] = "";  // Search filter for log tab
+
+        // Signaling flags
         bool settingsSaved = false;  // True when settings saved, cleared by basalt.cpp
         bool shaderPathsChanged = false;  // True when shader manager saved, cleared by basalt.cpp
         size_t maxEffects = 10;

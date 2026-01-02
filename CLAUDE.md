@@ -80,6 +80,44 @@ if (auto* fvp = dynamic_cast<FloatVecParam*>(param))
     value = fvp->value[vectorComponentIndex];  // 0, 1, 2, or 3
 ```
 
+## SettingsManager: Single Source of Truth for Settings
+
+Just like `EffectRegistry` for effect parameters, `SettingsManager` (`src/settings_manager.hpp`) is the **ONLY** source of truth for application settings (keybindings, overlay options, etc.).
+
+### Data Flow
+
+```
+vkBasalt.conf ──(parsed ONCE at startup)──► SettingsManager ◄──► UI (reads/writes)
+                                                  │
+                                                  ▼
+                                       basalt.cpp reads settings
+                                                  │
+                                                  ▼
+                                         Layer behavior
+```
+
+### Rules
+
+1. **Config is parsed ONCE** - At startup, `settingsManager.initialize()` loads from `vkBasalt.conf`. After that, the file is NOT the source of truth.
+
+2. **UI reads/writes SettingsManager directly** - Use `settingsManager.getXxx()` and `settingsManager.setXxx()` in overlay code. No local copies of settings values.
+
+3. **Layer code reads from SettingsManager** - `basalt.cpp` uses `settingsManager.getDepthCapture()`, `settingsManager.getMaxEffects()`, etc.
+
+4. **Save writes SettingsManager → file** - Call `settingsManager.save()` to persist changes to `vkBasalt.conf`.
+
+### ImGui Slider Pattern
+
+When using sliders that read from SettingsManager, update immediately on change but save to file only on release:
+
+```cpp
+int value = settingsManager.getAutoApplyDelay();
+if (ImGui::SliderInt("##delay", &value, 20, 1000))
+    settingsManager.setAutoApplyDelay(value);  // Update immediately while dragging
+if (ImGui::IsItemDeactivatedAfterEdit())
+    settingsManager.save();  // Save to file only on release
+```
+
 ## Architecture Overview
 
 vkBasalt is a **Vulkan implicit layer** that intercepts Vulkan API calls to apply post-processing effects to game graphics.
@@ -185,6 +223,7 @@ In-game UI toggled with End key (configurable). The overlay:
 - **LogicalDevice** (`logical_device.hpp`): Wraps VkDevice with dispatch tables and queue info
 - **LogicalSwapchain** (`logical_swapchain.hpp`): Per-swapchain state including effects vector, command buffers, and semaphores
 - **EffectRegistry** (`effect_registry.hpp`): **THE** source of truth for effect configs and parameter values
+- **SettingsManager** (`settings_manager.hpp`): **THE** source of truth for application settings (keybindings, options)
 - **EffectConfig** (`effect_config.hpp`): Per-effect configuration including parameters
 
 ### Input Handling
