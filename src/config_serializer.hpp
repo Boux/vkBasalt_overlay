@@ -27,6 +27,7 @@ namespace vkBasalt
         std::string overlayKey = "End";
         bool enableOnLaunch = true;
         bool depthCapture = false;
+        bool autoApply = true;  // Auto-apply changes without clicking Apply
         int autoApplyDelay = 200;  // ms delay before auto-applying changes
         bool showDebugWindow = false;  // Show debug window with raw effect registry data
     };

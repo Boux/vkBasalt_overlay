@@ -30,6 +30,7 @@
 #include "buffer.hpp"
 #include "config.hpp"
 #include "config_serializer.hpp"
+#include "settings_manager.hpp"
 #include "fake_swapchain.hpp"
 #include "renderpass.hpp"
 #include "format.hpp"
@@ -202,6 +203,9 @@ namespace vkBasalt
 
         // Ensure vkBasalt.conf exists with defaults before reading
         ConfigSerializer::ensureConfigExists();
+
+        // Initialize settings manager (single source of truth for settings)
+        settingsManager.initialize();
 
         // Load base config (vkBasalt.conf) - used for paths, effect definitions
         pBaseConfig = std::make_shared<Config>();
@@ -947,7 +951,7 @@ namespace vkBasalt
 
         // Allow dynamic effect loading by allocating for more effects than configured
         // maxEffects defaults to 10, allowing users to enable additional effects at runtime
-        int32_t maxEffects = pConfig->getOption<int32_t>("maxEffects", 10);
+        int32_t maxEffects = settingsManager.getMaxEffects();
         size_t effectSlots = std::max(selectedEffects.size(), (size_t)maxEffects);
         pLogicalSwapchain->maxEffectSlots = effectSlots;
 
@@ -1037,7 +1041,7 @@ namespace vkBasalt
             static bool inputBlockerInited = false;
             if (!inputBlockerInited)
             {
-                initInputBlocker(pConfig->getOption<bool>("overlayBlockInput", false));
+                initInputBlocker(settingsManager.getOverlayBlockInput());
                 inputBlockerInited = true;
             }
         }
@@ -1051,28 +1055,28 @@ namespace vkBasalt
     {
         scoped_lock l(globalLock);
 
-        // Keybindings - can be reloaded when settings are saved
-        static uint32_t keySymbol = convertToKeySym(pConfig->getOption<std::string>("toggleKey", "Home"));
-        static uint32_t reloadKeySymbol = convertToKeySym(pConfig->getOption<std::string>("reloadKey", "F10"));
-        static uint32_t overlayKeySymbol = convertToKeySym(pConfig->getOption<std::string>("overlayKey", "End"));
+        // Keybindings - read from settingsManager (can be updated when settings are saved)
+        static uint32_t keySymbol = convertToKeySym(settingsManager.getToggleKey());
+        static uint32_t reloadKeySymbol = convertToKeySym(settingsManager.getReloadKey());
+        static uint32_t overlayKeySymbol = convertToKeySym(settingsManager.getOverlayKey());
         static bool initLogged = false;
 
         static bool pressed       = false;
-        static bool presentEffect = pConfig->getOption<bool>("enableOnLaunch", true);
+        static bool presentEffect = settingsManager.getEnableOnLaunch();
         static bool reloadPressed = false;
         static bool overlayPressed = false;
 
-        // Check if settings were saved (reload keybindings and other settings)
+        // Check if settings were saved (re-read from settingsManager which is already updated by UI)
         LogicalDevice* pDeviceForSettings = deviceMap[GetKey(queue)].get();
         if (pDeviceForSettings && pDeviceForSettings->imguiOverlay && pDeviceForSettings->imguiOverlay->hasSettingsSaved())
         {
-            VkBasaltSettings newSettings = ConfigSerializer::loadSettings();
-            keySymbol = convertToKeySym(newSettings.toggleKey);
-            reloadKeySymbol = convertToKeySym(newSettings.reloadKey);
-            overlayKeySymbol = convertToKeySym(newSettings.overlayKey);
-            initInputBlocker(newSettings.overlayBlockInput);
+            // settingsManager is already updated by the UI, just re-read the values
+            keySymbol = convertToKeySym(settingsManager.getToggleKey());
+            reloadKeySymbol = convertToKeySym(settingsManager.getReloadKey());
+            overlayKeySymbol = convertToKeySym(settingsManager.getOverlayKey());
+            initInputBlocker(settingsManager.getOverlayBlockInput());
             pDeviceForSettings->imguiOverlay->clearSettingsSaved();
-            Logger::info("Settings reloaded");
+            Logger::info("Settings reloaded from SettingsManager");
         }
 
         // Check if shader paths were changed (refresh available effects list)
@@ -1467,7 +1471,7 @@ extern "C"
     GETPROCADDR(QueuePresentKHR); \
     GETPROCADDR(DestroySwapchainKHR); \
 \
-    if (vkBasalt::pConfig->getOption<std::string>("depthCapture", "off") == "on") \
+    if (vkBasalt::settingsManager.getDepthCapture()) \
     { \
         GETPROCADDR(CreateImage); \
         GETPROCADDR(DestroyImage); \

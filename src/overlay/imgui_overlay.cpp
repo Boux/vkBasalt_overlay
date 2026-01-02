@@ -1,5 +1,6 @@
 #include "imgui_overlay.hpp"
 #include "effects/effect_registry.hpp"
+#include "settings_manager.hpp"
 #include "logger.hpp"
 #include "mouse_input.hpp"
 #include "keyboard_input.hpp"
@@ -545,6 +546,18 @@ namespace vkBasalt
 
         // Debug window (separate, controlled by setting)
         renderDebugWindow();
+
+        // Global auto-apply check (runs regardless of which tab is active)
+        if (settingsManager.getAutoApply() && paramsDirty)
+        {
+            auto now = std::chrono::steady_clock::now();
+            auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastChangeTime).count();
+            if (elapsed >= settingsManager.getAutoApplyDelay())
+            {
+                applyRequested = true;
+                paramsDirty = false;
+            }
+        }
 
         // Focus Effects window on first frame of the session
         static bool firstFrame = true;

@@ -35,6 +35,7 @@ vkBasalt_src = [
     'command_buffer.cpp',
     'config.cpp',
     'config_serializer.cpp',
+    'settings_manager.cpp',
     'descriptor_set.cpp',
     'effects/effect.cpp',
     'effects/effect_registry.cpp',
