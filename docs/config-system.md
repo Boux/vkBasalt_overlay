@@ -316,4 +316,4 @@ Each Frame (vkQueuePresentKHR)
 |----------|-------------|
 | `VKBASALT_CONFIG_FILE` | Override config file path |
 | `VKBASALT_LOG_LEVEL` | Set logging level |
-| `ENABLE_VKBASALT` | Enable/disable vkBasalt (0 or 1) |
+| `ENABLE_VKBASALT_OVERLAY` | Enable/disable vkBasalt-overlay (0 or 1) |

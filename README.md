@@ -75,19 +75,25 @@ sudo ninja -C build-release install
 
 ### Test with vkgears
 ```bash
-ENABLE_VKBASALT=1 vkgears
+ENABLE_VKBASALT_OVERLAY=1 vkgears
 ```
 
 ### Steam
 Add to launch options:
 ```
-ENABLE_VKBASALT=1 %command%
+ENABLE_VKBASALT_OVERLAY=1 %command%
 ```
 
 ### Lutris
 1. Right-click game → Configure
 2. System options → Environment variables
-3. Add `ENABLE_VKBASALT` = `1`
+3. Add `ENABLE_VKBASALT_OVERLAY` = `1`
+
+### Coexistence with original vkBasalt
+This fork uses different names to coexist with the original vkBasalt:
+- Environment variable: `ENABLE_VKBASALT_OVERLAY` (vs `ENABLE_VKBASALT`)
+- Library: `libvkbasalt-overlay.so` (vs `libvkbasalt.so`)
+- Layer JSON: `vkBasalt-overlay.json` (vs `vkBasalt.json`)
 
 ## Configuration
 

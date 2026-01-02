@@ -43,7 +43,7 @@
 #include "imgui_overlay.hpp"
 #include "effects/effect_registry.hpp"
 
-#define VKBASALT_NAME "VK_LAYER_VKBASALT_post_processing"
+#define VKBASALT_NAME "VK_LAYER_VKBASALT_OVERLAY_post_processing"
 
 #if defined(__GNUC__) && __GNUC__ >= 4
 #define VK_BASALT_EXPORT __attribute__((visibility("default")))

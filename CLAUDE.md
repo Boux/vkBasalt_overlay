@@ -29,7 +29,7 @@ ninja -C builddir.32
 
 Run any Vulkan game/application with:
 ```bash
-ENABLE_VKBASALT=1 VKBASALT_LOG_LEVEL=debug ./game
+ENABLE_VKBASALT_OVERLAY=1 VKBASALT_LOG_LEVEL=debug ./game
 ```
 
 Use `VKBASALT_CONFIG_FILE=/path/to/config.conf` to test specific configurations.
@@ -224,13 +224,18 @@ X11-based keyboard/mouse input (`keyboard_input_x11.cpp`, `mouse_input.cpp`) com
 
 ## Environment Variables
 
-- `ENABLE_VKBASALT=1` - Enable the layer
-- `DISABLE_VKBASALT=1` - Force disable
+- `ENABLE_VKBASALT_OVERLAY=1` - Enable the layer (different from original vkBasalt's `ENABLE_VKBASALT`)
+- `DISABLE_VKBASALT_OVERLAY=1` - Force disable
 - `VKBASALT_LOG_LEVEL=debug` - Log levels: trace, debug, info, warn, error, none
 - `VKBASALT_LOG_FILE=/path/to/log` - Output to file instead of stderr
 - `VKBASALT_CONFIG_FILE=/path/to/conf` - Override config location
 
+**Note:** This fork uses different env vars and layer names to coexist with the original vkBasalt:
+- Library: `libvkbasalt-overlay.so` (vs `libvkbasalt.so`)
+- Layer: `VK_LAYER_VKBASALT_OVERLAY_post_processing` (vs `VK_LAYER_VKBASALT_post_processing`)
+- JSON: `vkBasalt-overlay.json` (vs `vkBasalt.json`)
+
 ## User Preferences
 
 - **File organization**: Proactively suggest splitting code into separate files when a file gets too large or a distinct responsibility emerges. Always inform the user before refactoring.
-- **After meson reconfigure (debug only)**: During development, the `build/config/vkBasalt.json` library_path may revert to relative path. Manually edit `build/config/vkBasalt.json` to fix `library_path` to absolute path: `/home/boux/repo/vkBasalt/build/src/libvkbasalt.so`. This is not needed for actual builds/releases.
+- **After meson reconfigure (debug only)**: During development, the `build/config/vkBasalt-overlay.json` library_path may revert to relative path. Manually edit `build/config/vkBasalt-overlay.json` to fix `library_path` to absolute path: `/home/boux/repo/vkBasalt/build/src/libvkbasalt-overlay.so`. This is not needed for actual builds/releases.
