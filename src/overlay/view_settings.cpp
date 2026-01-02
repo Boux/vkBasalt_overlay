@@ -72,17 +72,6 @@ namespace vkBasalt
         ImGui::Text("Overlay Options");
         ImGui::Separator();
 
-        if (ImGui::Checkbox("Block Input When Overlay Open", &settingsBlockInput))
-            saveSettings();
-        if (ImGui::IsItemHovered())
-        {
-            ImGui::BeginTooltip();
-            ImGui::Text("When enabled, keyboard and mouse input is captured by the overlay.");
-            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Warning: Experimental feature! May cause some games to freeze.");
-            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Also blocks ALL input system-wide, even outside the game window!");
-            ImGui::EndTooltip();
-        }
-
         ImGui::Text("Max Effects (requires restart):");
         if (ImGui::IsItemHovered())
         {
@@ -130,14 +119,29 @@ namespace vkBasalt
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("If enabled, effects are active when the game starts.\nIf disabled, effects start off and must be toggled on.");
 
-        if (ImGui::Checkbox("Depth Capture (requires restart)", &settingsDepthCapture))
+        ImGui::Spacing();
+        ImGui::Text("Advanced Options");
+        ImGui::Separator();
+
+        if (ImGui::Checkbox("Block Input When Overlay Open", &settingsBlockInput))
             saveSettings();
         if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Enable depth buffer capture for effects that use depth.\nMay impact performance. Most effects don't need this.\nChanges require restarting the application.");
+            ImGui::SetTooltip("When enabled, keyboard and mouse input is blocked\nfrom reaching the game while the overlay is open.");
 
-        ImGui::Spacing();
-        ImGui::Text("Debug");
-        ImGui::Separator();
+        if (ImGui::Checkbox("Depth Masking (experimental, requires restart)", &settingsDepthCapture))
+            saveSettings();
+        if (ImGui::IsItemHovered())
+        {
+            ImGui::BeginTooltip();
+            ImGui::Text("Apply effects only to 3D world, preserving UI/HUD.");
+            ImGui::Spacing();
+            ImGui::TextDisabled("Captures the game's depth buffer and uses it to");
+            ImGui::TextDisabled("skip effect processing on UI elements (depth = 1.0).");
+            ImGui::Spacing();
+            ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.4f, 1.0f), "May not work with all games.");
+            ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.4f, 1.0f), "Changes require restarting the application.");
+            ImGui::EndTooltip();
+        }
 
         if (ImGui::Checkbox("Show Debug Window", &settingsShowDebugWindow))
         {
