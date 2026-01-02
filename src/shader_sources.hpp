@@ -13,6 +13,10 @@ namespace vkBasalt
 #include "deband.frag.h"
     };
 
+    const std::vector<uint32_t> depth_composite_frag = {
+#include "depth_composite.frag.h"
+    };
+
     const std::vector<uint32_t> dls_frag = {
 #include "dls.frag.h"
     };
