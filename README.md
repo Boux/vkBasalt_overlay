@@ -1,7 +1,7 @@
 ## Fork Notice
 This is a fork of [vkBasalt](https://github.com/DadSchoorse/vkBasalt) with an experimental ImGui overlay for in-game effect configuration. Most of this fork was written with vibe-coding. I won't even pretend to own any of this code as I am not a C++ or Vulkan dev. I'm a webdev, I do CSS and I enjoy it. My monkey brain is too small for this low level stuff. I wanted these features in vkBasalt since forever so I just asked the AI to do it for me.
 
-If you want to request features, feel free to do so, it's still pretty incomplete, and kind of buggy, it may or may not crash or freeze some games. Adding one of those CRT-Guest shaders to a game that already caps-out your GPU to 100% WILL freeze your game and you WILL need to switch to a different TTY to kill the process.
+If you want to request features, feel free to do so, it's still pretty incomplete, and kind of buggy, it may or may not crash or freeze some games. Adding one of those CRT-Guest shaders to a game that already caps-out your GPU to 100% WILL freeze your game and you WILL need to switch to a different TTY to kill the process. Just a heads-up.
 
 ---
 
