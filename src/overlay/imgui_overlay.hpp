@@ -33,9 +33,9 @@ namespace vkBasalt
 
     // UI preferences that persist across swapchain recreation
     // Effect-related state is managed by EffectRegistry
+    // Settings are managed by SettingsManager
     struct OverlayPersistentState
     {
-        bool autoApply = true;
         bool visible = false;
     };
 
@@ -138,30 +138,21 @@ namespace vkBasalt
         std::vector<std::pair<std::string, std::string>> shaderTestQueue;  // {effectName, filePath}
         std::vector<std::tuple<std::string, std::string, bool, std::string>> shaderTestResults;  // {name, path, success, error}
 
-        // Settings state (editable copies of config values)
-        int settingsMaxEffects = 10;
-        bool settingsBlockInput = false;
-        char settingsToggleKey[32] = "Home";
-        char settingsReloadKey[32] = "F10";
-        char settingsOverlayKey[32] = "End";
-        bool settingsEnableOnLaunch = true;
-        bool settingsDepthCapture = false;
-        int settingsAutoApplyDelay = 200;  // ms delay before auto-applying changes
-        bool settingsInitialized = false;
+        // UI state for settings view
         int listeningForKey = 0;  // 0=none, 1=toggle, 2=reload, 3=overlay
-        bool settingsShowDebugWindow = false;  // Show debug window
+        bool settingsSaved = false;  // True when settings saved, cleared by basalt.cpp
+        bool shaderPathsChanged = false;  // True when shader manager saved, cleared by basalt.cpp
+        size_t maxEffects = 10;  // Cached from settingsManager for VRAM estimates
+
+        // UI state for debug window
         int debugWindowTab = 0;  // 0=Registry, 1=Log
         bool debugLogFilters[5] = {true, true, true, true, true};  // Trace, Debug, Info, Warn, Error
         char debugLogSearch[128] = "";  // Search filter for log tab
-        bool settingsSaved = false;  // True when settings saved, cleared by basalt.cpp
-        bool shaderPathsChanged = false;  // True when shader manager saved, cleared by basalt.cpp
-        size_t maxEffects = 10;
         int dragSourceIndex = -1;   // Index of effect being dragged, -1 if none
         int dragTargetIndex = -1;   // Index where effect will be dropped
         bool isDragging = false;    // True while actively dragging
         bool applyRequested = false;
         bool toggleEffectsRequested = false;
-        bool autoApply = true;
         bool paramsDirty = false;  // True when params changed, waiting for debounce
         std::chrono::steady_clock::time_point lastChangeTime;
         bool visible = false;

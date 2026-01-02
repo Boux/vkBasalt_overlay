@@ -82,29 +82,11 @@ namespace vkBasalt
             inConfigManageMode = true;
         ImGui::Separator();
 
-        // Initialize settings if not done yet (needed for key display)
-        if (!settingsInitialized)
-        {
-            VkBasaltSettings currentSettings = ConfigSerializer::loadSettings();
-            settingsMaxEffects = currentSettings.maxEffects;
-            maxEffects = static_cast<size_t>(currentSettings.maxEffects);
-            settingsBlockInput = currentSettings.overlayBlockInput;
-            strncpy(settingsToggleKey, currentSettings.toggleKey.c_str(), sizeof(settingsToggleKey) - 1);
-            strncpy(settingsReloadKey, currentSettings.reloadKey.c_str(), sizeof(settingsReloadKey) - 1);
-            strncpy(settingsOverlayKey, currentSettings.overlayKey.c_str(), sizeof(settingsOverlayKey) - 1);
-            settingsEnableOnLaunch = currentSettings.enableOnLaunch;
-            settingsDepthCapture = currentSettings.depthCapture;
-            settingsAutoApplyDelay = currentSettings.autoApplyDelay;
-            settingsShowDebugWindow = currentSettings.showDebugWindow;
-            Logger::setHistoryEnabled(settingsShowDebugWindow);
-            settingsInitialized = true;
-        }
-
         bool effectsOn = state.effectsEnabled;
         if (ImGui::Checkbox(effectsOn ? "Effects ON" : "Effects OFF", &effectsOn))
             toggleEffectsRequested = true;
         ImGui::SameLine();
-        ImGui::TextDisabled("(%s)", settingsToggleKey);
+        ImGui::TextDisabled("(%s)", settingsManager.getToggleKey().c_str());
         ImGui::Separator();
 
         // Add Effects button
@@ -275,7 +257,7 @@ namespace vkBasalt
 
                     if (ImGui::TreeNode("preprocessor", "Preprocessor (%zu)", defs.size()))
                     {
-                        ImGui::TextDisabled("Click Apply or press %s to recompile", settingsReloadKey);
+                        ImGui::TextDisabled("Click Apply or press %s to recompile", settingsManager.getReloadKey().c_str());
 
                         for (size_t defIdx = 0; defIdx < defs.size(); defIdx++)
                         {

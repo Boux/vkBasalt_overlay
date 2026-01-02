@@ -140,10 +140,7 @@ namespace vkBasalt
 
         // Restore UI preferences from persistent state
         if (pPersistentState)
-        {
-            autoApply = pPersistentState->autoApply;
             visible = pPersistentState->visible;
-        }
 
         initialized = true;
         Logger::info("ImGui overlay initialized");
@@ -184,8 +181,7 @@ namespace vkBasalt
         if (!pPersistentState)
             return;
 
-        // Only save UI preferences - effect state is in the registry
-        pPersistentState->autoApply = autoApply;
+        // Only save UI preferences - effect state is in the registry, settings in settingsManager
         pPersistentState->visible = visible;
     }
 
