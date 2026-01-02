@@ -9,6 +9,7 @@
 #include "framebuffer.hpp"
 #include "shader.hpp"
 #include "sampler.hpp"
+#include "settings_manager.hpp"
 #include "logger.hpp"
 #include "util.hpp"
 
@@ -62,9 +63,22 @@ namespace vkBasalt
         // Create render pass
         renderPass = createRenderPass(pLogicalDevice, format);
 
-        // Create pipeline layout
-        std::vector<VkDescriptorSetLayout> descriptorSetLayouts = {imageSamplerDescriptorSetLayout};
-        pipelineLayout = createGraphicsPipelineLayout(pLogicalDevice, descriptorSetLayouts);
+        // Create pipeline layout with push constant for enabled flag
+        VkPushConstantRange pushConstantRange = {};
+        pushConstantRange.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+        pushConstantRange.offset     = 0;
+        pushConstantRange.size       = sizeof(int32_t);
+
+        VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
+        pipelineLayoutInfo.sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+        pipelineLayoutInfo.setLayoutCount         = 1;
+        pipelineLayoutInfo.pSetLayouts            = &imageSamplerDescriptorSetLayout;
+        pipelineLayoutInfo.pushConstantRangeCount = 1;
+        pipelineLayoutInfo.pPushConstantRanges    = &pushConstantRange;
+
+        VkResult layoutResult = pLogicalDevice->vkd.CreatePipelineLayout(
+            pLogicalDevice->device, &pipelineLayoutInfo, nullptr, &pipelineLayout);
+        ASSERT_VULKAN(layoutResult);
 
         // Get threshold from config
         float depthThreshold = pConfig->getOption<float>("depthMaskThreshold", 0.9999f);
@@ -125,12 +139,10 @@ namespace vkBasalt
 
     void DepthCompositeEffect::applyEffect(uint32_t imageIndex, VkCommandBuffer commandBuffer)
     {
-        // If no depth image, skip compositing
-        if (depthImageView == VK_NULL_HANDLE)
-        {
-            Logger::warn("DepthCompositeEffect: no depth image available, skipping");
-            return;
-        }
+        // Determine if depth masking is enabled
+        // Requires both: setting enabled AND depth image available
+        bool depthMaskingEnabled = settingsManager.getDepthCapture() && (depthImageView != VK_NULL_HANDLE);
+        int32_t enabledFlag = depthMaskingEnabled ? 1 : 0;
 
         // Update descriptor sets if needed (when depth image changes)
         if (descriptorSetsNeedUpdate)
@@ -240,6 +252,10 @@ namespace vkBasalt
             &imageDescriptorSets[imageIndex], 0, nullptr);
 
         pLogicalDevice->vkd.CmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+
+        // Push enabled flag (0 = passthrough, 1 = depth masking)
+        pLogicalDevice->vkd.CmdPushConstants(
+            commandBuffer, pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(int32_t), &enabledFlag);
 
         pLogicalDevice->vkd.CmdDraw(commandBuffer, 3, 1, 0, 0);
 

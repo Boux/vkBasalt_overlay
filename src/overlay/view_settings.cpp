@@ -141,7 +141,7 @@ namespace vkBasalt
             ImGui::SetTooltip("When enabled, keyboard and mouse input is blocked\nfrom reaching the game while the overlay is open.");
 
         bool depthCapture = settingsManager.getDepthCapture();
-        if (ImGui::Checkbox("Depth Masking (experimental, requires restart)", &depthCapture))
+        if (ImGui::Checkbox("Depth Masking (experimental)", &depthCapture))
         {
             settingsManager.setDepthCapture(depthCapture);
             saveSettings();
@@ -155,7 +155,6 @@ namespace vkBasalt
             ImGui::TextDisabled("skip effect processing on UI elements (depth = 1.0).");
             ImGui::Spacing();
             ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.4f, 1.0f), "May not work with all games.");
-            ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.4f, 1.0f), "Changes require restarting the application.");
             ImGui::EndTooltip();
         }
 

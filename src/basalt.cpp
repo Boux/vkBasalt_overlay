@@ -374,45 +374,22 @@ namespace vkBasalt
         VkFormat unormFormat = convertToUNORM(pLogicalSwapchain->format);
         VkFormat srgbFormat = convertToSRGB(pLogicalSwapchain->format);
 
-        // Check if depth masking is enabled
-        bool depthMaskingEnabled = !pLogicalSwapchain->originalImages.empty();
+        std::vector<VkImage> firstImages(pLogicalSwapchain->fakeImages.begin(),
+                                         pLogicalSwapchain->fakeImages.begin() + pLogicalSwapchain->imageCount);
 
-        // If no effects, add pass-through (or depth composite if depth masking)
+        // Always copy input to originalImages first (for depth masking support)
+        // DepthCompositeEffect will passthrough when depth masking is disabled
+        pLogicalSwapchain->effects.push_back(std::shared_ptr<Effect>(new TransferEffect(
+            pLogicalDevice, pLogicalSwapchain->format, pLogicalSwapchain->imageExtent,
+            firstImages, pLogicalSwapchain->originalImages, pConfig)));
+
+        // If no effects, just add depth composite (it passthroughs when disabled)
         if (effectStrings.empty())
         {
-            std::vector<VkImage> firstImages(pLogicalSwapchain->fakeImages.begin(),
-                                             pLogicalSwapchain->fakeImages.begin() + pLogicalSwapchain->imageCount);
-
-            if (depthMaskingEnabled)
-            {
-                // With depth masking but no effects: copy to original, then depth composite
-                // This allows depth masking to work even without any effects enabled
-                pLogicalSwapchain->effects.push_back(std::shared_ptr<Effect>(new TransferEffect(
-                    pLogicalDevice, pLogicalSwapchain->format, pLogicalSwapchain->imageExtent,
-                    firstImages, pLogicalSwapchain->originalImages, pConfig)));
-
-                pLogicalSwapchain->effects.push_back(std::shared_ptr<Effect>(new DepthCompositeEffect(
-                    pLogicalDevice, pLogicalSwapchain->format, pLogicalSwapchain->imageExtent,
-                    pLogicalSwapchain->originalImages, firstImages, pLogicalSwapchain->images, pConfig)));
-            }
-            else
-            {
-                pLogicalSwapchain->effects.push_back(std::shared_ptr<Effect>(new TransferEffect(
-                    pLogicalDevice, pLogicalSwapchain->format, pLogicalSwapchain->imageExtent,
-                    firstImages, pLogicalSwapchain->images, pConfig)));
-            }
-            return;
-        }
-
-        // With depth masking: first copy input to originalImages to preserve pre-effects state
-        if (depthMaskingEnabled)
-        {
-            std::vector<VkImage> firstImages(pLogicalSwapchain->fakeImages.begin(),
-                                             pLogicalSwapchain->fakeImages.begin() + pLogicalSwapchain->imageCount);
-            pLogicalSwapchain->effects.push_back(std::shared_ptr<Effect>(new TransferEffect(
+            pLogicalSwapchain->effects.push_back(std::shared_ptr<Effect>(new DepthCompositeEffect(
                 pLogicalDevice, pLogicalSwapchain->format, pLogicalSwapchain->imageExtent,
-                firstImages, pLogicalSwapchain->originalImages, pConfig)));
-            Logger::debug("added copy-to-original effect for depth masking");
+                pLogicalSwapchain->originalImages, firstImages, pLogicalSwapchain->images, pConfig)));
+            return;
         }
 
         for (uint32_t i = 0; i < effectStrings.size(); i++)
@@ -424,24 +401,15 @@ namespace vkBasalt
                                              pLogicalSwapchain->fakeImages.begin() + pLogicalSwapchain->imageCount * (i + 1));
 
             // Calculate output images
-            // With depth masking: last effect writes to intermediate buffer (depth composite outputs to swapchain)
-            // Without depth masking: last effect writes to swapchain (if mutable) or final fake images
+            // Last effect always writes to intermediate buffer (DepthCompositeEffect outputs to swapchain)
             std::vector<VkImage> secondImages;
             bool isLastEffect = (i == effectStrings.size() - 1);
 
             if (isLastEffect)
             {
-                if (depthMaskingEnabled || !pLogicalDevice->supportsMutableFormat)
-                {
-                    // Output to intermediate buffer (last fakeImages slot)
-                    secondImages = std::vector<VkImage>(pLogicalSwapchain->fakeImages.end() - pLogicalSwapchain->imageCount,
-                                                        pLogicalSwapchain->fakeImages.end());
-                }
-                else
-                {
-                    // Output directly to swapchain
-                    secondImages = pLogicalSwapchain->images;
-                }
+                // Always output to intermediate buffer (DepthCompositeEffect outputs to swapchain)
+                secondImages = std::vector<VkImage>(pLogicalSwapchain->fakeImages.end() - pLogicalSwapchain->imageCount,
+                                                    pLogicalSwapchain->fakeImages.end());
             }
             else
             {
@@ -506,24 +474,13 @@ namespace vkBasalt
             }
         }
 
-        // Add depth composite effect (reads original + effected, outputs to swapchain)
-        if (depthMaskingEnabled)
-        {
-            std::vector<VkImage> effectedImages(pLogicalSwapchain->fakeImages.end() - pLogicalSwapchain->imageCount,
-                                                pLogicalSwapchain->fakeImages.end());
-            pLogicalSwapchain->effects.push_back(std::shared_ptr<Effect>(new DepthCompositeEffect(
-                pLogicalDevice, pLogicalSwapchain->format, pLogicalSwapchain->imageExtent,
-                pLogicalSwapchain->originalImages, effectedImages, pLogicalSwapchain->images, pConfig)));
-            Logger::debug("added depth composite effect");
-        }
-        // If device doesn't support mutable format (and not depth masking), add final transfer
-        else if (!pLogicalDevice->supportsMutableFormat)
-        {
-            pLogicalSwapchain->effects.push_back(std::shared_ptr<Effect>(new TransferEffect(
-                pLogicalDevice, pLogicalSwapchain->format, pLogicalSwapchain->imageExtent,
-                std::vector<VkImage>(pLogicalSwapchain->fakeImages.end() - pLogicalSwapchain->imageCount, pLogicalSwapchain->fakeImages.end()),
-                pLogicalSwapchain->images, pConfig)));
-        }
+        // Always add depth composite effect (reads original + effected, outputs to swapchain)
+        // It passthroughs when depth masking is disabled via settingsManager
+        std::vector<VkImage> effectedImages(pLogicalSwapchain->fakeImages.end() - pLogicalSwapchain->imageCount,
+                                            pLogicalSwapchain->fakeImages.end());
+        pLogicalSwapchain->effects.push_back(std::shared_ptr<Effect>(new DepthCompositeEffect(
+            pLogicalDevice, pLogicalSwapchain->format, pLogicalSwapchain->imageExtent,
+            pLogicalSwapchain->originalImages, effectedImages, pLogicalSwapchain->images, pConfig)));
     }
 
     // Helper function to reload effects for a swapchain (for hot-reload)
@@ -1007,27 +964,20 @@ namespace vkBasalt
         size_t effectSlots = std::max(selectedEffects.size(), (size_t)maxEffects);
         pLogicalSwapchain->maxEffectSlots = effectSlots;
 
-        // Check if depth masking is enabled (from settings manager)
-        bool depthMaskingEnabled = settingsManager.getDepthCapture();
-
-        // Create 1 more set of images when we can't write directly to swapchain:
-        // - !supportsMutableFormat: need final transfer
-        // - depthMaskingEnabled: effects output to intermediate, depth composite outputs to swapchain
-        bool needsIntermediateOutput = !pLogicalDevice->supportsMutableFormat || depthMaskingEnabled;
+        // Always allocate resources for depth masking (allows runtime toggle without restart)
+        // The DepthCompositeEffect will passthrough when disabled via settingsManager
+        bool needsIntermediateOutput = true;  // Always need intermediate for depth composite
         uint32_t fakeImageCount = pLogicalSwapchain->imageCount * (effectSlots + needsIntermediateOutput);
 
         pLogicalSwapchain->fakeImages =
             createFakeSwapchainImages(pLogicalDevice, pLogicalSwapchain->swapchainCreateInfo, fakeImageCount, pLogicalSwapchain->fakeImageMemory);
         Logger::debug("created fake swapchain images");
 
-        // Create original images for depth masking (stores pre-effects state)
-        if (depthMaskingEnabled)
-        {
-            pLogicalSwapchain->originalImages = createFakeSwapchainImages(
-                pLogicalDevice, pLogicalSwapchain->swapchainCreateInfo,
-                pLogicalSwapchain->imageCount, pLogicalSwapchain->originalImageMemory);
-            Logger::debug("created original images for depth masking");
-        }
+        // Always create original images for depth masking (stores pre-effects state)
+        pLogicalSwapchain->originalImages = createFakeSwapchainImages(
+            pLogicalDevice, pLogicalSwapchain->swapchainCreateInfo,
+            pLogicalSwapchain->imageCount, pLogicalSwapchain->originalImageMemory);
+        Logger::debug("created original images for depth masking support");
 
         if (!isFirstRun && !selectedEffects.empty())
         {
