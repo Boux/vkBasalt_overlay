@@ -3,6 +3,7 @@
 *.so
 *.o
 build*/
+.cache/
 
 imgui.ini
 build-debug.sh

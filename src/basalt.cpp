@@ -66,11 +66,11 @@ namespace vkBasalt
     std::unordered_map<void*, std::shared_ptr<LogicalDevice>>             deviceMap;
     std::unordered_map<VkSwapchainKHR, std::shared_ptr<LogicalSwapchain>> swapchainMap;
 
-    std::mutex globalLock;
+    std::recursive_mutex globalLock;
 #ifdef _GCC_
-    using scoped_lock __attribute__((unused)) = std::lock_guard<std::mutex>;
+    using scoped_lock __attribute__((unused)) = std::lock_guard<std::recursive_mutex>;
 #else
-    using scoped_lock = std::lock_guard<std::mutex>;
+    using scoped_lock = std::lock_guard<std::recursive_mutex>;
 #endif
 
     template<typename DispatchableType>
@@ -722,13 +722,17 @@ namespace vkBasalt
             physicalDevice, nullptr, &extensionCount, extensionProperties.data());
 
         bool supportsMutableFormat = false;
+        bool supportsSwapchain     = false;
         for (VkExtensionProperties properties : extensionProperties)
         {
             if (properties.extensionName == std::string("VK_KHR_swapchain_mutable_format"))
             {
                 Logger::debug("device supports VK_KHR_swapchain_mutable_format");
                 supportsMutableFormat = true;
-                break;
+            }
+            else if (properties.extensionName == std::string("VK_KHR_swapchain"))
+            {
+                supportsSwapchain = true;
             }
         }
 
@@ -743,6 +747,12 @@ namespace vkBasalt
                                                              modifiedCreateInfo.ppEnabledExtensionNames + modifiedCreateInfo.enabledExtensionCount);
         }
 
+        // Always enable VK_KHR_swapchain when supported. This works around a bug in
+        // lsfg-vk which uses global (not per-device) dispatch pointers: when a second
+        // device without VK_KHR_swapchain is created, lsfg-vk overwrites its globals
+        // with NULL, causing a crash when the main device's swapchain is later destroyed.
+        if (supportsSwapchain)
+            addUniqueCString(enabledExtensionNames, "VK_KHR_swapchain");
         if (supportsMutableFormat)
         {
             Logger::debug("activating mutable_format");
@@ -868,8 +878,8 @@ namespace vkBasalt
         VkImageFormatListCreateInfoKHR imageFormatListCreateInfo;
         if (pLogicalDevice->supportsMutableFormat)
         {
-            modifiedCreateInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT
-                                            | VK_IMAGE_USAGE_SAMPLED_BIT; // we want to use the swapchain images as output of the graphics pipeline
+            modifiedCreateInfo.imageUsage |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT
+                                             | VK_IMAGE_USAGE_SAMPLED_BIT; // we want to use the swapchain images as output of the graphics pipeline
             modifiedCreateInfo.flags |= VK_SWAPCHAIN_CREATE_MUTABLE_FORMAT_BIT_KHR;
             // TODO what if the application already uses multiple formats for the swapchain?
 
