@@ -6,9 +6,20 @@
 #include <memory>
 #include <utility>
 #include <cstdint>
+#include <sstream>
+#include <locale>
 
 namespace vkBasalt
 {
+    // Locale-independent float-to-string (always uses '.' as decimal separator)
+    inline std::string floatToString(float v)
+    {
+        std::ostringstream ss;
+        ss.imbue(std::locale::classic());
+        ss << v;
+        return ss.str();
+    }
+
     enum class ParamType
     {
         Float,
@@ -59,7 +70,7 @@ namespace vkBasalt
 
         std::vector<std::pair<std::string, std::string>> serialize() const override
         {
-            return {{"", std::to_string(value)}};
+            return {{"", floatToString(value)}};
         }
 
         std::unique_ptr<EffectParam> clone() const override
@@ -118,7 +129,7 @@ namespace vkBasalt
         {
             std::vector<std::pair<std::string, std::string>> result;
             for (uint32_t i = 0; i < componentCount; i++)
-                result.push_back({name + "[" + std::to_string(i) + "]", std::to_string(value[i])});
+                result.push_back({name + "[" + std::to_string(i) + "]", floatToString(value[i])});
             return result;
         }
 

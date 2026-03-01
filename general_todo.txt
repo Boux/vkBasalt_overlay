@@ -3,3 +3,5 @@
 - manually edit param value
 - fix depth capture
 - save button feedback
+- double click to reset not working
+- right click on param for popup with fine-tunes and other options

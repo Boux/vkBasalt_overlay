@@ -7,3 +7,4 @@ build*/
 
 imgui.ini
 build-debug.sh
+.cache/
